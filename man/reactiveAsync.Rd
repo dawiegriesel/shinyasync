@@ -30,7 +30,8 @@ the worker.}
 }
 \value{
 A reactive expression of class \code{"reactiveAsync"}. Use it with
-\code{\link[=status_async]{status_async()}}, \code{\link[=cancel_async]{cancel_async()}} and \code{\link[shiny:bindEvent]{shiny::bindEvent()}}.
+\code{\link[=status_async]{status_async()}}, \code{\link[=stale_async]{stale_async()}}, \code{\link[=cancel_async]{cancel_async()}} and
+\code{\link[shiny:bindEvent]{shiny::bindEvent()}}.
 }
 \description{
 Like \code{\link[shiny:reactive]{shiny::reactive()}}, but \code{expr} is evaluated on a \code{mirai} daemon so the

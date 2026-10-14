@@ -8,6 +8,9 @@
 # together with the placeholder values and any user-defined globals it needs.
 
 session_fns <- c("req", "validate", "invalidateLater", "isolate")
+# Reactive reads of async objects; hoisted like reactive reads, but not part
+# of a result's provenance since they change without the inputs changing.
+async_fns <- c("status_async", "stale_async", "inputs_async")
 
 new_capture <- function(expr, env, globals = NULL) {
   if (!is.null(globals) && (!is.list(globals) || is.null(names(globals)) ||
@@ -19,9 +22,40 @@ new_capture <- function(expr, env, globals = NULL) {
   # rather than on every invalidation.
   fn_cache <- new.env(parent = emptyenv())
 
-  resolve <- function() {
-    # Analysed on first use, so reactives defined later in server() resolve.
+  # Analysed on first use, so reactives defined later in server() resolve.
+  analyze <- function() {
     if (is.null(analysis)) analysis <<- analyze_expr(expr, env)
+  }
+
+  # The reactive reads a run depends on, evaluated now: a named list keyed by
+  # the deparsed read. Stored with each result so stale_async() can compare.
+  # `args` are the values of the hoisted calls, if they have been evaluated
+  # already; only reads nested inside a hoisted call are evaluated here.
+  inputs <- function(args = NULL) {
+    analyze()
+    out <- lapply(names(analysis$inputs), function(key) {
+      i <- match(key, analysis$keys)
+      if (!is.null(args) && !is.na(i)) args[[i]] else eval(analysis$inputs[[key]], env)
+    })
+    names(out) <- names(analysis$inputs)
+    out
+  }
+
+  # The reactiveAsync() objects among the tracked reads, so staleness can
+  # follow a chain.
+  upstream <- function() {
+    analyze()
+    out <- list()
+    for (x in analysis$inputs) {
+      if (!is.call(x) || length(x) != 1L || !is.symbol(x[[1]])) next
+      hit <- lookup(as.character(x[[1]]), env, mode = "function")
+      if (hit$found && inherits(hit$value, "reactiveAsync")) out[[length(out) + 1L]] <- hit$value
+    }
+    out
+  }
+
+  resolve <- function() {
+    analyze()
     args <- lapply(analysis$hoisted, eval, envir = env)
     names(args) <- analysis$placeholders
     skip <- c(analysis$placeholders, names(globals))
@@ -32,20 +66,23 @@ new_capture <- function(expr, env, globals = NULL) {
     list(
       expr = worker_expr(analysis$expr, deps$pkgs),
       args = args,
-      globals = c(deps$values, globals)
+      globals = c(deps$values, globals),
+      inputs = inputs(args)
     )
   }
 
-  list(resolve = resolve)
+  list(resolve = resolve, inputs = inputs, upstream = upstream)
 }
 
 # Rewrite `expr` for the worker. Returns the rewritten expression, the hoisted
-# calls with their placeholder names, the free names the worker needs
-# (`free`), and names that appear in formulas (`soft`), which are shipped only
-# if they resolve to a plain object.
+# calls with their placeholder names, the reactive reads that make up a
+# result's provenance (`inputs`), the free names the worker needs (`free`),
+# and names that appear in formulas (`soft`), which are shipped only if they
+# resolve to a plain object.
 analyze_expr <- function(expr, env) {
   hoisted <- list()
   keys <- character()
+  inputs <- structure(list(), names = character())
   roots <- character()
   formula_names <- character()
 
@@ -59,6 +96,26 @@ analyze_expr <- function(expr, env) {
       i <- length(keys)
     }
     as.name(paste0(".sa_", i))
+  }
+
+  # Record the reactive reads in a hoisted call as the provenance of a result:
+  # the call itself, or the reads inside `req(input$n)`, skipping anything
+  # under isolate() and the status reads of async objects.
+  track_reads <- function(x) {
+    if (!is.call(x)) return(invisible())
+    head <- x[[1]]
+    if (identical(head, quote(quote)) || identical(head, quote(`function`))) {
+      return(invisible())
+    }
+    kind <- hoist_kind(x, env, character())
+    if (identical(kind, "read")) {
+      key <- paste(deparse(x), collapse = "\n")
+      if (!key %in% names(inputs)) inputs[[key]] <<- x
+      return(invisible())
+    }
+    if (identical(kind, "isolate") || identical(kind, "async")) return(invisible())
+    for (j in seq_along(x)[-1]) track_reads(x[[j]])
+    invisible()
   }
 
   walk_args <- function(x, idx, locals, conditional, isolated) {
@@ -111,7 +168,7 @@ analyze_expr <- function(expr, env) {
     }
 
     kind <- hoist_kind(x, env, locals)
-    if (identical(kind, "read")) return(hoist(x, isolated))
+    if (identical(kind, "read") || identical(kind, "async")) return(hoist(x, isolated))
 
     if (!is.null(kind)) {
       uses_locals <- any(free_names(x) %in% locals)
@@ -158,12 +215,16 @@ analyze_expr <- function(expr, env) {
   }
 
   rewritten <- walk(expr, local_names(expr))
+  # Hoisted calls never use expression locals, so no shadowing to respect here.
+  for (x in hoisted) track_reads(x)
   placeholders <- if (length(keys)) paste0(".sa_", seq_along(keys)) else character()
   free <- setdiff(unique(c(free_names(rewritten), roots)), placeholders)
   list(
     expr = rewritten,
     hoisted = hoisted,
     placeholders = placeholders,
+    keys = keys,
+    inputs = inputs,
     free = free,
     soft = setdiff(unique(formula_names), c(free, placeholders))
   )
@@ -204,8 +265,9 @@ local_names <- function(x) {
   unique(out)
 }
 
-# "read" for a reactive read, the function name for a session-only shiny
-# call, NULL otherwise.
+# "read" for a reactive read, "async" for status_async() and friends on an
+# async object, the function name for a session-only shiny call, NULL
+# otherwise.
 hoist_kind <- function(x, env, locals) {
   head <- x[[1]]
 
@@ -227,7 +289,49 @@ hoist_kind <- function(x, env, locals) {
     if (hit$found && shiny::is.reactive(hit$value)) return("read")
   }
 
+  # status_async(r), stale_async(r), inputs_async(r), also on `mod$r`
+  if (length(x) == 2L && !is.null(async_fn_name(head, env, locals))) {
+    obj <- async_arg_object(x[[2]], env, locals)
+    if (is.environment(attr(obj, "shinyasync", exact = TRUE))) return("async")
+  }
+
   shiny_fn_name(head, env, locals)
+}
+
+# The object a status_async()-style call refers to: a symbol, or a literal
+# `$`/`[[` field of a plain list or environment such as a module's return
+# value. NULL when it cannot be resolved without a reactive context.
+async_arg_object <- function(arg, env, locals) {
+  if (is.symbol(arg)) {
+    if (as.character(arg) %in% locals) return(NULL)
+    hit <- lookup(as.character(arg), env)
+    return(if (hit$found) hit$value)
+  }
+  if (!is.call(arg) || length(arg) != 3L) return(NULL)
+  head <- arg[[1]]
+  if (!identical(head, quote(`$`)) && !identical(head, quote(`[[`))) return(NULL)
+  key <- arg[[3]]
+  literal <- is.character(key) || (identical(head, quote(`$`)) && is.symbol(key))
+  if (!literal) return(NULL)
+  root <- async_arg_object(arg[[2]], env, locals)
+  if (is.null(root) || is_reactive_like(root) || !(is.list(root) || is.environment(root))) {
+    return(NULL)
+  }
+  root[[as.character(key)]]
+}
+
+async_fn_name <- function(head, env, locals = character()) {
+  if (is.call(head) && identical(head[[1]], quote(`::`)) &&
+      identical(head[[2]], quote(shinyasync)) && as.character(head[[3]]) %in% async_fns) {
+    return(as.character(head[[3]]))
+  }
+  if (is.symbol(head) && as.character(head) %in% async_fns &&
+      !as.character(head) %in% locals) {
+    name <- as.character(head)
+    hit <- lookup(name, env, mode = "function")
+    if (hit$found && identical(hit$value, getExportedValue("shinyasync", name))) return(name)
+  }
+  NULL
 }
 
 shiny_fn_name <- function(head, env, locals = character()) {

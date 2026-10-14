@@ -120,6 +120,27 @@ observe({
 output$t <- renderPrint(v())
 ```
 
+### Chained async reactives
+
+An async reactive can read another one. While the upstream task runs its
+reactive returns the previous value, so a downstream expression can briefly see
+a new input next to an upstream value computed from the old one. Guard the
+upstream read with `stale_async()` to wait until it has caught up:
+
+```r
+wind <- reactiveAsync(fetch_wind(input$spot))
+
+scored <- reactiveAsync({
+  req(!stale_async(wind))                 # keep the old score until wind matches input$spot
+  score(wind(), input$spot)
+})
+```
+
+Staleness follows a chain, so one guard protects the link it is in, and an error
+in `wind` propagates through the guard as it would through `reactive()`.
+`inputs_async(wind)` returns the values `wind()` was computed from, keyed by
+the deparsed read, e.g. `inputs_async(wind)[["input$spot"]]`.
+
 ### Modules
 
 Nothing changes inside `moduleServer()`: the namespaced `input` and the module's local objects are captured like any others, and the async reactive can be returned to the caller. Call `pool_async()` once in the top-level server.
@@ -178,6 +199,10 @@ A `reactiveVal` whose setter accepts a `mirai` (or a `promise`). The value updat
 ### `status_async(r)`
 
 Reactive status of an async reactive: `"idle"`, `"running"`, `"success"` or `"error"`. Use it for spinners and disabled buttons. Reading the status of a `reactiveAsync()` that has not run yet starts it, the same way reading its value does.
+
+### `stale_async(r)` and `inputs_async(r)`
+
+Provenance of a `reactiveAsync()` result. `inputs_async(r)` is a reactive read of the values the current result was computed from, keyed by the deparsed read (`"input$x"`, `"data()"`), or `NULL` before the first result. `stale_async(r)` is `TRUE` when there is no result yet, when those reads now evaluate to something different, or when an upstream `reactiveAsync()` that `r` reads is itself stale; it is `FALSE` otherwise, including while a task re-runs with the same inputs. Reads inside `isolate()` are not part of the provenance. An error in `r` is re-thrown, as on a read of `r()`.
 
 ### `cancel_async(r)`
 

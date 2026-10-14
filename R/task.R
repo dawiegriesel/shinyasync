@@ -14,6 +14,8 @@ new_async_task <- function(mode = c("latest", "queue"), label = "shinyasync",
   # Wrapped in a list so that NULL results are distinguishable from "no value".
   st$value <- shiny::reactiveVal(NULL, label = paste0(label, "$value"))
   st$error <- shiny::reactiveVal(NULL, label = paste0(label, "$error"))
+  # The reactive reads the current value was computed from; see inputs_async().
+  st$inputs <- shiny::reactiveVal(NULL, label = paste0(label, "$inputs"))
   st$state <- "idle"
   st$gen <- 0L
   st$current <- NULL
@@ -65,11 +67,12 @@ new_async_task <- function(mode = c("latest", "queue"), label = "shinyasync",
     # mirai() only treats `.expr` as a language object when given a symbol.
     expr <- job$expr
     m <- mirai::mirai(.expr = expr, list2env(job$globals), .args = job$args)
-    st$adopt(m)
+    st$adopt(m, job$inputs)
   }
 
-  # Track any mirai or promise as the current task.
-  st$adopt <- function(x) {
+  # Track any mirai or promise as the current task. `inputs` are stored with
+  # the value if this task succeeds.
+  st$adopt <- function(x, inputs = NULL) {
     if (!identical(st$current, x)) stop_current()
     st$gen <- gen <- st$gen + 1L
     st$current <- x
@@ -84,7 +87,7 @@ new_async_task <- function(mode = c("latest", "queue"), label = "shinyasync",
     }
 
     if (inherits(x, "mirai")) {
-      settle <- function(...) finish(function() settle_mirai(x$data))
+      settle <- function(...) finish(function() settle_mirai(x$data, inputs))
       promises::then(x, onFulfilled = settle, onRejected = settle)
       # The promise notification for a mirai that resolves very quickly can be
       # lost (seen with mirai 2.7.3 / nanonext 1.10.3), so also poll.
@@ -96,7 +99,7 @@ new_async_task <- function(mode = c("latest", "queue"), label = "shinyasync",
     } else {
       promises::then(
         x,
-        onFulfilled = function(value) finish(function() st$succeed(value)),
+        onFulfilled = function(value) finish(function() st$succeed(value, inputs)),
         onRejected = function(e) finish(function() {
           if (inherits(e, "shiny.silent.error")) settle_silent() else st$fail(e)
         })
@@ -107,9 +110,9 @@ new_async_task <- function(mode = c("latest", "queue"), label = "shinyasync",
     invisible(x)
   }
 
-  settle_mirai <- function(data) {
+  settle_mirai <- function(data, inputs) {
     if (!mirai::is_error_value(data)) {
-      st$succeed(data)
+      st$succeed(data, inputs)
     } else if ("shiny.silent.error" %in% attr(data, "condition.class")) {
       settle_silent()
     } else if (mirai::is_mirai_error(data)) {
@@ -128,9 +131,10 @@ new_async_task <- function(mode = c("latest", "queue"), label = "shinyasync",
     set_status(settled_status())
   }
 
-  st$succeed <- function(value) {
+  st$succeed <- function(value, inputs = NULL) {
     st$current <- NULL
     st$value(list(value))
+    st$inputs(inputs)
     st$error(NULL)
     set_status("success")
   }

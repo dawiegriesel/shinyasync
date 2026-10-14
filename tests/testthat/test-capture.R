@@ -169,3 +169,65 @@ test_that("closure free names are cached across runs", {
   expect_silent(job <- shiny::isolate(cap$resolve()))
   expect_equal(job$globals$helper(1), 2)
 })
+
+test_that("provenance tracks plain reads and reads inside req(), not isolated or status reads", {
+  input <- shiny::reactiveValues(n = 1, m = 2, seed = 3)
+  data <- shiny::reactive(1)
+  up <- reactiveAsync(1)
+  req <- shiny::req
+  isolate <- shiny::isolate
+  a <- analyze_expr(quote({
+    req(input$n, isolate(input$seed))
+    k <- isolate(input$m + 1)
+    if (status_async(up) == "success") data() else stale_async(up)
+  }), environment())
+
+  expect_equal(names(a$inputs), c("input$n", "data()"))
+  expect_equal(a$inputs[["data()"]], quote(data()))
+  has_hoisted <- function(call) any(vapply(a$hoisted, identical, logical(1), call))
+  expect_true(has_hoisted(quote(status_async(up))))
+  expect_true(has_hoisted(quote(stale_async(up))))
+  expect_false("up" %in% a$free)
+
+  cap <- new_capture(quote(input$n + data()), environment())
+  expect_equal(shiny::isolate(cap$inputs()), list(`input$n` = 1, `data()` = 1))
+  job <- shiny::isolate(cap$resolve())
+  expect_equal(job$inputs, list(`input$n` = 1, `data()` = 1))
+})
+
+test_that("status_async() on a non-async object or a local is left alone", {
+  up <- shiny::reactive(1)
+  a <- analyze_expr(quote(status_async(up)), environment())
+  expect_length(a$hoisted, 0)
+  a <- analyze_expr(quote(sapply(1:2, function(up) status_async(up))), environment())
+  expect_length(a$hoisted, 0)
+})
+
+test_that("status_async() on a list field or a `[[` read is hoisted; reactive fields are not touched", {
+  mod <- list(up = reactiveAsync(1))
+  rv <- shiny::reactiveValues(up = 1)
+  input <- shiny::reactiveValues(x = 1)
+  a <- analyze_expr(quote(status_async(mod$up) + stale_async(mod[["up"]]) + input[["x"]]), environment())
+  expect_equal(a$hoisted[[1]], quote(status_async(mod$up)))
+  expect_equal(a$hoisted[[2]], quote(stale_async(mod[["up"]])))
+  expect_equal(names(a$inputs), "input[[\"x\"]]")
+  expect_false("mod" %in% a$free)
+  a <- analyze_expr(quote(status_async(rv$up)), environment())
+  expect_equal(a$hoisted, list(quote(rv$up)))
+
+  cap <- new_capture(quote(input[["x"]] + stale_async(mod$up)), environment())
+  expect_identical(cap$upstream(), list())
+  cap <- new_capture(quote(mod$up + up2()), environment())
+  up2 <- mod$up
+  expect_identical(cap$upstream(), list(up2))
+})
+
+test_that("run inputs reuse the evaluated hoisted values", {
+  input <- shiny::reactiveValues(n = 1)
+  calls <- 0
+  data <- shiny::reactive({ calls <<- calls + 1; 2 })
+  cap <- new_capture(quote(input$n + data()), environment())
+  job <- shiny::isolate(cap$resolve())
+  expect_equal(job$inputs, list(`input$n` = 1, `data()` = 2))
+  expect_equal(calls, 1)
+})
