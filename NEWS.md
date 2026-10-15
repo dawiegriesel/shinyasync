@@ -1,5 +1,9 @@
 # shinyasync (development version)
 
+* New `has_value_async()` is `TRUE` when reading an async reactive would
+  return a value rather than halt or throw. With `status_async()` it tells a
+  first run, which wants a spinner, from a refresh, which wants a "showing
+  the previous result" note (#3).
 * New `stale_async()` and `inputs_async()` expose the provenance of a
   `reactiveAsync()` result: the reactive reads it was computed from. A chained
   async reactive can guard an upstream read with `req(!stale_async(up))` so

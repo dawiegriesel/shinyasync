@@ -24,8 +24,7 @@ reactiveValAsync <- function(value = NULL, label = NULL) {
 
   rv <- function(x) {
     if (missing(x)) {
-      err <- task$error()
-      if (!is.null(err)) stop(err)
+      if (!task$has_value()) stop(task$error())
       return(task$value()[[1]])
     }
     if (inherits(x, "mirai") || promises::is.promising(x)) {

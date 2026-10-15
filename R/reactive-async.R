@@ -48,8 +48,8 @@
 #' @param quoted Is `expr` a quoted expression?
 #'
 #' @return A reactive expression of class `"reactiveAsync"`. Use it with
-#'   [status_async()], [stale_async()], [cancel_async()] and
-#'   [shiny::bindEvent()].
+#'   [status_async()], [has_value_async()], [stale_async()], [cancel_async()]
+#'   and [shiny::bindEvent()].
 #' @export
 #' @examples
 #' if (interactive()) {
@@ -94,16 +94,15 @@ reactiveAsync <- function(expr, mode = c("latest", "queue"), globals = NULL,
 
   r <- shiny::reactive(label = label, {
     task$start()
-    err <- task$error()
-    if (!is.null(err)) stop(err)
-    value <- task$value()
-    if (is.null(value)) {
+    if (!task$has_value()) {
+      err <- task$error()
+      if (!is.null(err)) stop(err)
       if (identical(task$status(), "running")) {
         shiny::req(FALSE, cancelOutput = "progress")
       }
       shiny::req(FALSE)
     }
-    value[[1]]
+    task$value()[[1]]
   })
 
   class(r) <- c("reactiveAsync", class(r))

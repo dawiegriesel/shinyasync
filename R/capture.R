@@ -10,7 +10,7 @@
 session_fns <- c("req", "validate", "invalidateLater", "isolate")
 # Reactive reads of async objects; hoisted like reactive reads, but not part
 # of a result's provenance since they change without the inputs changing.
-async_fns <- c("status_async", "stale_async", "inputs_async")
+async_fns <- c("status_async", "has_value_async", "stale_async", "inputs_async")
 
 new_capture <- function(expr, env, globals = NULL) {
   if (!is.null(globals) && (!is.list(globals) || is.null(names(globals)) ||
@@ -289,7 +289,8 @@ hoist_kind <- function(x, env, locals) {
     if (hit$found && shiny::is.reactive(hit$value)) return("read")
   }
 
-  # status_async(r), stale_async(r), inputs_async(r), also on `mod$r`
+  # status_async(r), has_value_async(r), stale_async(r), inputs_async(r),
+  # also on `mod$r`
   if (length(x) == 2L && !is.null(async_fn_name(head, env, locals))) {
     obj <- async_arg_object(x[[2]], env, locals)
     if (is.environment(attr(obj, "shinyasync", exact = TRUE))) return("async")

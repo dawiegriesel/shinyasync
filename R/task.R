@@ -38,6 +38,15 @@ new_async_task <- function(mode = c("latest", "queue"), label = "shinyasync",
 
   settled_status <- function() if (is.null(shiny::isolate(st$value()))) "idle" else "success"
 
+  # Whether a read would return a value rather than halt or throw. Reads both
+  # reactive values unconditionally so callers depend on both; a value is only
+  # ever stored together with a cleared error (see succeed()).
+  st$has_value <- function() {
+    has_error <- !is.null(st$error())
+    has_value <- !is.null(st$value())
+    !has_error && has_value
+  }
+
   stop_current <- function() {
     if (inherits(st$current, "mirai")) mirai::stop_mirai(st$current)
     st$current <- NULL

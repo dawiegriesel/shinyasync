@@ -73,6 +73,19 @@ shinyApp(ui, server)
 
 Drag the slider: the previous density stays on screen while the new one computes, and other users of the app are never blocked.
 
+### Spinner or previous result
+
+While a task runs the status is `"running"` whether or not there is a previous
+value on screen. `has_value_async()` tells the two apart:
+
+```r
+output$note <- renderUI({
+  running <- status_async(r) == "running"
+  if (running && !has_value_async(r)) icon("spinner", class = "fa-spin")
+  else if (running) span(class = "text-muted", "Showing the previous result while the new one computes")
+})
+```
+
 ### Button-triggered
 
 Use `bindEvent()` exactly as you would with `reactive()`:
@@ -199,6 +212,10 @@ A `reactiveVal` whose setter accepts a `mirai` (or a `promise`). The value updat
 ### `status_async(r)`
 
 Reactive status of an async reactive: `"idle"`, `"running"`, `"success"` or `"error"`. Use it for spinners and disabled buttons. Reading the status of a `reactiveAsync()` that has not run yet starts it, the same way reading its value does.
+
+### `has_value_async(r)`
+
+Reactive read that is `TRUE` when reading `r` would return a value rather than halt or throw: a result has arrived and the last run did not fail. Combine it with `status_async()` to show a spinner on first load and a "previous result" note during a refresh.
 
 ### `stale_async(r)` and `inputs_async(r)`
 
