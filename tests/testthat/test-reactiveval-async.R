@@ -20,6 +20,19 @@ test_that("reactiveValAsync accepts plain values, mirai and promises", {
   })
 })
 
+test_that("reactiveValAsync generates distinct default labels", {
+  first <- reactiveValAsync()
+  second <- reactiveValAsync()
+  first_label <- attr(first, "shinyasync")$label
+  second_label <- attr(second, "shinyasync")$label
+
+  expect_match(first_label, "^reactiveValAsync")
+  expect_false(identical(first_label, second_label))
+
+  named <- reactiveValAsync(label = "report")
+  expect_identical(attr(named, "shinyasync")$label, "report")
+})
+
 test_that("a newer task supersedes an older one", {
   local_pool()
   shiny::testServer(function(input, output, session) {
