@@ -1,5 +1,8 @@
 # shinyasync 0.2.0
 
+* `reactiveValAsync()` now gives each value a distinct default label, so
+  multiple values can be distinguished in reactlog. Explicit labels are
+  unchanged (#21).
 * New vignette, `vignette("testing")`, on testing async reactives with
   `shiny::testServer()`: a few lines pump the event loop and the mock session
   until a task settles, using only the mock session's public methods (#7).

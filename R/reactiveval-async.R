@@ -26,8 +26,16 @@
 #'     output$report <- renderTable(report())
 #'   }
 #' }
+default_reactive_val_async_label <- local({
+  id <- 0L
+  function(expr) {
+    id <<- id + 1L
+    paste0(default_label("reactiveValAsync", expr), " [", id, "]")
+  }
+})
+
 reactiveValAsync <- function(value = NULL, label = NULL) {
-  label <- label %||% "reactiveValAsync"
+  label <- label %||% default_reactive_val_async_label(substitute(value))
   task <- new_async_task("latest", label)
   task$value(list(value))
 
