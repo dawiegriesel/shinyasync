@@ -359,7 +359,7 @@ fails with a message saying so.
 
 ## Status and feedback wanted
 
-Experimental. The API may still change until the package is published to CRAN. See [NEWS.md](NEWS.md) for changes.
+Experimental. The API may still change until the package is published to CRAN. See the [changelog](https://dawiegriesel.github.io/shinyasync/news/) for changes.
 
 The package is not on CRAN yet on purpose. Dependency capture rewrites your expression, and real apps are the best way to find the cases it gets wrong. If you try it, please report:
 
