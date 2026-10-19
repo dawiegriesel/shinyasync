@@ -40,6 +40,13 @@ test_that("cancelling a task that was started after an error clears the error", 
   })
 })
 
+test_that("the post-registration check is gated on the nanonext version", {
+  local_mocked_bindings(packageVersion = function(...) package_version("1.10.3"), .package = "utils")
+  expect_true(loses_notification())
+  local_mocked_bindings(packageVersion = function(...) package_version("1.10.3.9000"), .package = "utils")
+  expect_false(loses_notification())
+})
+
 test_that("a task that completes before its promise is registered still settles", {
   # mirai's as.promise() checks unresolved() and then registers the
   # notification with .keep(); a task that completes in between never
