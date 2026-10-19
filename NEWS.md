@@ -1,5 +1,11 @@
 # shinyasync (development version)
 
+* The default pool size respects the CPU limits of the process's cgroup. It
+  was one less than `parallel::detectCores()`, which reports the host's
+  cores, so in a container or on Posit Connect with a CPU quota or cpuset
+  the default pool started a daemon per host core. It is now one less than
+  the host's cores capped by the tightest cgroups v1 or v2 quota or cpuset
+  on the process or any ancestor cgroup (#17).
 * New vignette, `vignette("extendedtask")`, writes the surf forecast app with
   `ExtendedTask` and with shinyasync side by side, one piece at a time: the
   pool, a fetch from an input, status and the previous value, a button with

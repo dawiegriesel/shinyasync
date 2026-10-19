@@ -8,7 +8,9 @@ pool_async(workers = NULL, ..., everywhere = NULL)
 }
 \arguments{
 \item{workers}{Number of local daemons. Defaults to one less than the
-number of cores.}
+number of cores available to the process: the machine's cores, capped by
+a CPU quota or cpuset on its cgroup, as in a container or on Posit
+Connect.}
 
 \item{...}{Passed to \code{\link[mirai:daemons]{mirai::daemons()}}, e.g. \code{url} or \code{remote} for remote
 pools. A dispatcher is always used, because cancellation requires one.}

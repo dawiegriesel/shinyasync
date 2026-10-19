@@ -80,7 +80,9 @@ pool_state$preload <- NULL
 #' message saying so.
 #'
 #' @param workers Number of local daemons. Defaults to one less than the
-#'   number of cores.
+#'   number of cores available to the process: the machine's cores, capped by
+#'   a CPU quota or cpuset on its cgroup, as in a container or on Posit
+#'   Connect.
 #' @param ... Passed to [mirai::daemons()], e.g. `url` or `remote` for remote
 #'   pools. A dispatcher is always used, because cancellation requires one.
 #' @param everywhere An expression to evaluate once on every worker when the
@@ -168,7 +170,9 @@ ensure_pool <- function(compute = NULL) {
   pool_async()
 }
 
-default_workers <- function() max(1L, parallel::detectCores() - 1L, na.rm = TRUE)
+# One less than the cores available to the process, leaving one for the
+# session; see available_cores() for what limits them.
+default_workers <- function() max(1L, available_cores() - 1L)
 
 # Preloading ---------------------------------------------------------------
 

@@ -292,7 +292,7 @@ and modules.
 
 ## Deployment
 
-`shinyasync` is deployment-agnostic. Each R process gets its own daemon pool, sized to one less than its core count unless you call `pool_async()`, so under a multi-process load balancer such as [faucet](https://github.com/ixpantia/faucet) or Posit Connect you should size `workers` so that `processes × workers` fits the host, or point every process at one shared remote daemon set:
+`shinyasync` is deployment-agnostic. Each R process gets its own daemon pool, sized to one less than the cores available to it unless you call `pool_async()` (a container's CPU quota or cpuset counts, as on Posit Connect), so under a multi-process load balancer such as [faucet](https://github.com/ixpantia/faucet) or Posit Connect you should size `workers` so that `processes × workers` fits the host, or point every process at one shared remote daemon set:
 
 ```r
 pool_async(url = "tcp://daemon-host:5555")
