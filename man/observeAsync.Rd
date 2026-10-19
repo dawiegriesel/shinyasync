@@ -31,13 +31,19 @@ the worker.}
 \value{
 An observer handle of class \code{"observeAsync"}: a list with methods
 \code{status()}, \code{cancel()}, \code{destroy()}, \code{suspend()} and \code{resume()}.
-
-Errors raised by \code{expr}, in the worker or while resolving its reactive
-dependencies, are reported with \code{\link[=message]{message()}} and leave the observer in
-status \code{"error"} until a dependency changes; the session stays open.
 }
 \description{
 Like \code{\link[shiny:observe]{shiny::observe()}}, but \code{expr} runs on a \code{mirai} daemon. Dependencies
 are captured the same way as in \code{\link[=reactiveAsync]{reactiveAsync()}}. When a dependency changes
 while a task is running, the running task is cancelled and a new one starts.
+}
+\details{
+Unlike \code{\link[=reactiveAsync]{reactiveAsync()}}, it does not wait to be read: like
+\code{\link[shiny:observe]{shiny::observe()}}, it runs on the next reactive flush. There is no
+\code{mode = "queue"}; for work that must run once per change, use
+\code{reactiveAsync(mode = "queue")} and read its result.
+
+Errors raised by \code{expr}, in the worker or while resolving its reactive
+dependencies, are reported with \code{\link[=message]{message()}} and leave the observer in
+status \code{"error"} until a dependency changes; the session stays open.
 }

@@ -4,16 +4,21 @@
 #' are captured the same way as in [reactiveAsync()]. When a dependency changes
 #' while a task is running, the running task is cancelled and a new one starts.
 #'
+#' Unlike [reactiveAsync()], it does not wait to be read: like
+#' [shiny::observe()], it runs on the next reactive flush. There is no
+#' `mode = "queue"`; for work that must run once per change, use
+#' `reactiveAsync(mode = "queue")` and read its result.
+#'
+#' Errors raised by `expr`, in the worker or while resolving its reactive
+#' dependencies, are reported with [message()] and leave the observer in
+#' status `"error"` until a dependency changes; the session stays open.
+#'
 #' @inheritParams reactiveAsync
 #' @param ... Passed to [shiny::observe()], e.g. `priority`, `suspended` or
 #'   `domain`.
 #'
 #' @return An observer handle of class `"observeAsync"`: a list with methods
 #'   `status()`, `cancel()`, `destroy()`, `suspend()` and `resume()`.
-#'
-#' Errors raised by `expr`, in the worker or while resolving its reactive
-#' dependencies, are reported with [message()] and leave the observer in
-#' status `"error"` until a dependency changes; the session stays open.
 #' @export
 observeAsync <- function(expr, ..., globals = NULL, label = NULL,
                          env = parent.frame(), quoted = FALSE) {
