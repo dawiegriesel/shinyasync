@@ -213,14 +213,15 @@ monitor in the sidebar shows the status of each one.
 
 ## API
 
-### `reactiveAsync(expr, mode = c("latest", "queue"))`
+### `reactiveAsync(expr, mode = c("latest", "queue"), globals = NULL)`
 
 Returns a reactive. `expr` is evaluated in a worker. Reactive dependencies are captured on the session thread and their resolved values shipped to the worker.
 
 - `mode = "latest"` (default): a new invalidation cancels the running task.
 - `mode = "queue"`: tasks run in order, matching `ExtendedTask`'s default.
+- `globals`: a named list of extra objects for the worker, for values capture cannot find on its own.
 
-### `observeAsync(expr, ...)`
+### `observeAsync(expr, ..., globals = NULL)`
 
 Like `observe()`, but `expr` runs in a worker. Returns an observer handle with `$status()`, `$cancel()`, `$destroy()`, `$suspend()` and `$resume()`. Nothing reads an observer's result, so errors from `expr` are reported with `message()` and the status becomes `"error"` until a dependency changes.
 
