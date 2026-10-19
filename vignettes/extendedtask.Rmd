@@ -183,13 +183,18 @@ finished. A plain `reactive()` would only ever compute the latest.
 
 ```{r latest-sa}
 # shinyasync
-swell <- reactiveAsync(fetch_marine(input$spot))                  # cancels, runs latest
-log   <- reactiveAsync(append_log(input$event), mode = "queue")   # runs every one
+swell <- reactiveAsync(fetch_marine(input$spot))                        # cancels, runs latest
+saved <- reactiveAsync(save_favourite(input$favourite), mode = "queue")  # runs every one
+
+output$saved <- renderText(saved())
 ```
 
 `reactiveAsync()` cancels the running fetch and starts the latest, as a
 reactive would. `mode = "queue"` gives `ExtendedTask`'s behaviour for work
-that must not be skipped.
+that must not be skipped, such as saving each spot the user marks as a
+favourite. Like any `reactiveAsync()`, a queued one starts only once
+something reads it, here the confirmation text. `observeAsync()` has no
+queue mode: a dependency change cancels its running task.
 
 ## A task that depends on another
 
