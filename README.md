@@ -46,7 +46,7 @@ Documentation: <https://dawiegriesel.github.io/shinyasync/>
 pak::pak("dawiegriesel/shinyasync")
 ```
 
-Requires R ≥ 4.1, shiny ≥ 1.8.1 and mirai ≥ 2.0.
+Requires R ≥ 4.1, shiny ≥ 1.8.1 and mirai ≥ 2.5.0.
 
 ## Quick start
 
