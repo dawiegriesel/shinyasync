@@ -27,7 +27,7 @@
 #'   }
 #' }
 reactiveValAsync <- function(value = NULL, label = NULL) {
-  label <- label %||% assign_label(sys.call(), "reactiveValAsync")
+  label <- label %||% assign_label(sys.calls(), "reactiveValAsync")
   task <- new_async_task("latest", label)
   task$value(list(value))
 

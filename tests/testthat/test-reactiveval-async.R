@@ -68,6 +68,8 @@ test_that("the label is the name the value is assigned to", {
   eval(parse(text = "report <- reactiveValAsync()\nx = reactiveValAsync(1)", keep.source = TRUE), env)
   expect_equal(attr(env$report, "shinyasync")$label, "report")
   expect_equal(attr(env$x, "shinyasync")$label, "x")
+  eval(parse(text = "ranked <- reactiveValAsync() |> identity()", keep.source = TRUE), env)
+  expect_equal(attr(env$ranked, "shinyasync")$label, "ranked")
   eval(parse(text = "plain <- reactiveValAsync()", keep.source = FALSE), env)
   expect_match(attr(env$plain, "shinyasync")$label, "^reactiveValAsync#[0-9]+$")
   named <- reactiveValAsync(label = "mine")

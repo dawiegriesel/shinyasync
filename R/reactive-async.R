@@ -142,15 +142,21 @@ default_label <- function(fn, expr) {
 
 # The name a call is assigned to, as shiny::reactiveVal() labels itself:
 # `report <- reactiveValAsync()` gives "report". The statement's source
-# reference rides on the call when the code was parsed with keep.source;
-# otherwise, or when the call is not the whole right-hand side, `default`.
-assign_label <- function(call, default) {
-  srcref <- attr(call, "srcref", exact = TRUE)
-  if (is.null(srcref)) return(unique_label(default))
-  text <- tryCatch(paste(as.character(srcref), collapse = "\n"), error = function(e) "")
-  m <- regmatches(text, regexec("^\\s*([^[:space:]]+)\\s*(<<-|<-|=)\\s*reactiveValAsync\\b", text))[[1]]
-  if (length(m) < 2L) return(unique_label(default))
-  m[2]
+# reference rides on the innermost call that R attaches one to, when the code
+# was parsed with keep.source. Under a pipe that is the outer call, so
+# `ranking <- reactiveValAsync() |> bind_task_button("rank")` is read from the
+# bind_task_button() frame. Without a reference, or when the statement is not
+# an assignment of the call, the label is a unique one.
+assign_label <- function(calls, default) {
+  for (call in rev(calls)) {
+    srcref <- attr(call, "srcref", exact = TRUE)
+    if (is.null(srcref)) next
+    text <- tryCatch(paste(as.character(srcref), collapse = "\n"), error = function(e) "")
+    m <- regmatches(text, regexec("^\\s*([^[:space:]]+)\\s*(<<-|<-|=)\\s*reactiveValAsync\\b", text))[[1]]
+    if (length(m) < 2L) break
+    return(m[2])
+  }
+  unique_label(default)
 }
 
 # A value not created by an assignment, as in lapply(), gets a label that is
