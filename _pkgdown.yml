@@ -3,6 +3,13 @@ url: https://dawiegriesel.github.io/shinyasync/
 template:
   bootstrap: 5
 
+articles:
+- title: Articles
+  navbar: ~
+  contents:
+  - extendedtask
+  - testing
+
 reference:
 - title: Async reactives
   desc: Counterparts of reactive(), observe() and reactiveVal() that run on a mirai daemon.

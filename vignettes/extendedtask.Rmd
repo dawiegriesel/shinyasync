@@ -177,8 +177,8 @@ observe(updateActionButton(session, "go", disabled = status_async(sim) == "runni
 ## Inputs that change while a task runs
 
 Drag the spot selector through three spots while a fetch is running.
-`ExtendedTask` queues: the three invocations run one after another, each
-occupying a worker, and the output settles on the third after all have
+`ExtendedTask` queues: the three invocations run one after another on a
+single worker, and the output settles on the third after all have
 finished. A plain `reactive()` would only ever compute the latest.
 
 ```{r latest-sa}
@@ -258,7 +258,7 @@ mirai, and `mirai_async()`, which starts a mirai with the same capture as
 
 ```{r fanout-sa}
 # shinyasync
-ranked <- lapply(spots, function(spot) reactiveValAsync())
+ranked <- lapply(seq_along(spots), function(i) reactiveValAsync())
 
 observe({
   for (i in seq_along(spots)) {
@@ -268,6 +268,10 @@ observe({
 
 output$ranking <- renderTable(do.call(rbind, lapply(ranked, function(r) r())))
 ```
+
+Each value is `NULL` until its task has returned and `rbind()` skips the
+`NULL`s, so the table shows the spots whose tasks are done and gains a row as
+each of the others arrives.
 
 ## Modules and tests
 
@@ -289,7 +293,7 @@ likely to meet:
 
 - Reads must appear literally in the expression. `input[[paste0("x", i)]]`
   or a read inside a helper function cannot be resolved; read it in a
-  `reactive()` first.
+  `reactive()` first, or pass the value with `globals = list(...)`.
 - Every read is a dependency, even in a branch that is not taken, unless it
   is wrapped in `isolate()`.
 - The task must be a mirai. `ExtendedTask` accepts any promise, so a

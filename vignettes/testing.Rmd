@@ -51,7 +51,11 @@ wait_for <- function(cond, session, timeout = 15) {
   start <- Sys.time()
   repeat {
     session$flushReact()
-    if (isTRUE(shiny::isolate(cond()))) return(invisible(TRUE))
+    if (isTRUE(shiny::isolate(cond()))) {
+      # Let observers see a value that arrived during the last flush.
+      session$flushReact()
+      return(invisible(TRUE))
+    }
     if (difftime(Sys.time(), start, units = "secs") > timeout) {
       stop(
         "Timed out after ", timeout, "s waiting for: ",
@@ -64,13 +68,26 @@ wait_for <- function(cond, session, timeout = 15) {
 }
 ```
 
-Put both helpers in `tests/testthat/helper-async.R` and every test file
-sees them.
+The second flush after the condition holds lets an observer that depends on
+the value run before the test goes on to check what it did.
 
 The condition is any reactive read: the value, `status_async()` or
 `has_value_async()`. The read runs inside `isolate()`, so it does not register
 dependencies, but it still starts a task that has not run yet, the same way an
 output reading the reactive would.
+
+Reading a value that is not there yet halts, as `req()` does, and a halt
+inside `expect_equal()` is a confusing failure. `peek()` reads a reactive
+and returns a marker instead:
+
+```{r peek}
+peek <- function(r) {
+  tryCatch(shiny::isolate(r()), shiny.silent.error = function(e) "<halted>")
+}
+```
+
+Put the three helpers in `tests/testthat/helper-async.R` and every test file
+sees them.
 
 ## A first test
 
@@ -136,8 +153,11 @@ test_that("a button task runs on click and stops on cancel", {
 ```
 
 `session$setInputs()` flushes the session, so the status is `"running"` as
-soon as the click is set. The cancelled run had not produced a result, so
-there is no previous value to keep and `has_value_async()` is `FALSE`.
+soon as the click is set. That only holds because the task has work to do:
+a task that finishes within the flush that dispatched it settles in that
+flush, and a test that reads its status straight after `setInputs()` sees
+`"success"`. The cancelled run had not produced a result, so there is no
+previous value to keep and `has_value_async()` is `FALSE`.
 
 ## Errors
 
@@ -159,6 +179,132 @@ test_that("a worker error is re-thrown on read", {
   })
 })
 ```
+
+## Side effects
+
+`observeAsync()` has no value to read. Its handle reports the status, and the
+side effect is what the test checks: here a line written to a log file.
+
+```{r observe}
+log_path <- tempfile(fileext = ".log")
+
+server <- function(input, output, session) {
+  logged <- observeAsync(cat(input$spot, file = log_path, sep = "\n", append = TRUE))
+}
+
+test_that("each selected spot is logged", {
+  local_pool()
+  testServer(server, {
+    session$setInputs(spot = "Muizenberg")
+    wait_for(function() logged$status() == "success", session)
+    expect_equal(readLines(log_path), "Muizenberg")
+  })
+})
+```
+
+The observer starts on the next flush, like `observe()`, so there is nothing
+to read first. `status_async(logged)` reads the same status as `logged$status()`.
+
+## Values fed by hand
+
+`reactiveValAsync()` is set from an observer, usually with a mirai started
+by `mirai_async()`. Test it as any `reactiveVal()`, waiting for the task
+the setter was handed:
+
+```{r reactiveval}
+rank_spots <- function(spots) sort(spots)
+
+server <- function(input, output, session) {
+  ranking <- reactiveValAsync()
+  observe(ranking(mirai_async(rank_spots(input$spots)))) |> bindEvent(input$rank)
+}
+
+test_that("the ranking arrives after the click", {
+  local_pool()
+  testServer(server, {
+    session$setInputs(spots = c("Kommetjie", "Muizenberg", "Elands Bay"))
+    expect_null(ranking())
+
+    session$setInputs(rank = 1)
+    wait_for(function() has_value_async(ranking), session)
+    expect_equal(ranking()[[1]], "Elands Bay")
+  })
+})
+```
+
+Before the click the value is `NULL`, as it would be for a `reactiveVal()`
+created without one; only `reactiveAsync()` halts until its first result.
+`mirai_async()` ships `rank_spots()` with the task, as it would
+a helper from the app's `R/` directory.
+
+## Queued runs
+
+With `mode = "queue"` every change runs, in order, where the default would
+cancel the superseded ones. An observer collecting the results into a
+`reactiveVal()` is the easiest way to see the order:
+
+```{r queue}
+save_favourite <- function(spot) paste("saved", spot)
+
+server <- function(input, output, session) {
+  saved <- reactiveAsync({
+    Sys.sleep(0.2)
+    save_favourite(input$favourite)
+  }, mode = "queue")
+  seen <- reactiveVal(character())
+  observe(seen(c(isolate(seen()), saved())))
+}
+
+test_that("every favourite is saved, in order", {
+  local_pool()
+  testServer(server, {
+    session$setInputs(favourite = "Kommetjie")
+    session$setInputs(favourite = "Muizenberg")
+    session$setInputs(favourite = "Elands Bay")
+    wait_for(function() identical(peek(saved), "saved Elands Bay"), session)
+    expect_equal(seen(), c("saved Kommetjie", "saved Muizenberg", "saved Elands Bay"))
+  })
+})
+```
+
+The three inputs are set before the first task finishes. A queued reactive
+starts, like any `reactiveAsync()`, only once something reads it, which the
+observer does on the first flush.
+
+## Chained reactives
+
+An async reactive that reads another one keeps its previous value and reports
+`"running"` while its upstream is catching up, then runs once on the settled
+value. A test can see each step:
+
+```{r chain}
+server <- function(input, output, session) {
+  fit <- reactiveAsync({
+    Sys.sleep(1)
+    lm(mpg ~ wt, data = mtcars[seq_len(input$rows), ])
+  })
+  predicted <- reactiveAsync(predict(fit(), data.frame(wt = 3)))
+}
+
+test_that("a prediction waits for the model it depends on", {
+  local_pool()
+  testServer(server, {
+    session$setInputs(rows = 32)
+    wait_for(function() has_value_async(predicted), session)
+    first <- predicted()
+
+    session$setInputs(rows = 10)
+    expect_equal(status_async(predicted), "running")
+    expect_equal(peek(predicted), first)
+    wait_for(function() !identical(peek(predicted), first), session)
+    expect_equal(status_async(fit), "success")
+  })
+})
+```
+
+Waiting on the downstream reactive is enough: reading `predicted` starts
+`fit`, and the second wait ends only when a new model has been fitted and
+predicted from.
 
 ## Modules
 

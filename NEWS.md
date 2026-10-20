@@ -1,3 +1,17 @@
+# shinyasync (development version)
+
+* `vignette("testing")` now covers every primitive: sections on
+  `observeAsync()`, `reactiveValAsync()` with `mirai_async()`,
+  `mode = "queue"` and a chained `reactiveAsync()`, plus the `peek()` helper
+  for reading a reactive that may halt. Its `wait_for()` matches the
+  package's own test helper again, flushing once more after the condition
+  holds so observers see the value, and the article notes that a task which
+  finishes within the flush that dispatched it is never seen `"running"`.
+* `vignette("extendedtask")` describes queued invocations as sequential on
+  one worker, mentions `globals = list(...)` for reads capture cannot
+  resolve, and says the fan-out table gains a row as each task returns. The
+  pkgdown site lists the articles in that order.
+
 # shinyasync 0.3.0
 
 * The default pool size respects the CPU limits of the process's cgroup. It
