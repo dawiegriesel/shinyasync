@@ -111,8 +111,11 @@ new_capture <- function(expr, env, globals = NULL) {
       error = identity
     )
     if (inherits(deps, "error")) {
+      # Keep the residents the expression itself names, so the print still
+      # says what the worker will supply while the error is being fixed.
       deps <- list(
-        values = list(), pkgs = character(), resident = character(),
+        values = list(), pkgs = character(),
+        resident = intersect(pool_residents(), c(a$free, a$soft)),
         error = conditionMessage(deps)
       )
     }
