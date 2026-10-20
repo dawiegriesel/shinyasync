@@ -1,5 +1,9 @@
 # shinyasync (development version)
 
+* A `reactiveValAsync()` not created by an assignment, as in `lapply()`, gets
+  a default label that is unique in the process, as `shiny::reactiveVal()`
+  does, so such values can be told apart in reactlog. Values assigned to a
+  name keep that name as their label (#21, #24, @LeonidasZhak).
 * `vignette("testing")` now covers every primitive: sections on
   `observeAsync()`, `reactiveValAsync()` with `mirai_async()`,
   `mode = "queue"` and a chained `reactiveAsync()`, plus the `peek()` helper
