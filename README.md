@@ -1,4 +1,4 @@
-# shinyasync
+# shinyasync <img src="man/figures/logo.png" align="right" height="139" alt="" />
 
 <!-- badges: start -->
 [![R-CMD-check](https://github.com/dawiegriesel/shinyasync/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/dawiegriesel/shinyasync/actions/workflows/R-CMD-check.yaml)
