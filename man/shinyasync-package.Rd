@@ -6,6 +6,8 @@
 \alias{shinyasync-package}
 \title{shinyasync: Async Shiny Reactives on 'mirai'}
 \description{
+\if{html}{\figure{logo.png}{options: style='float: right' alt='logo' width='120'}}
+
 Move slow work off the 'Shiny' session thread without changing how you write 'Shiny'. Provides asynchronous counterparts of reactive(), observe() and reactiveVal() that evaluate their expressions on 'mirai' daemons, track reactive dependencies, cancel superseded work and return the previous value while a new one is computed.
 }
 \seealso{
