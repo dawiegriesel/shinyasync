@@ -7,8 +7,8 @@
 #' Methods for [bslib::bind_task_button()] so that a [bslib::input_task_button()]
 #' shows its busy state while the task of a [reactiveAsync()], [observeAsync()]
 #' or [reactiveValAsync()] is `"running"` and returns to ready when it settles
-#' or is cancelled, as it does for an `ExtendedTask`. Reading the status
-#' starts a [reactiveAsync()] that has not run yet, as any status read does.
+#' or is cancelled, as it does for an `ExtendedTask`. Binding reads the task
+#' status without starting a [reactiveAsync()] that nothing has read yet.
 #'
 #' @param target An object created by [reactiveAsync()], [observeAsync()] or
 #'   [reactiveValAsync()].
@@ -59,12 +59,15 @@ bind_task_button.reactiveValAsync <- function(target, task_button_id, ...,
 }
 
 bind_task_button_async <- function(target, task_button_id, session) {
-  get_task(target, "bind_task_button")
+  task <- get_task(target, "bind_task_button")
   force(task_button_id)
+  if (is.null(session)) {
+    stop("`bind_task_button()` must be called from within a Shiny session.", call. = FALSE)
+  }
   was_running <- FALSE
   shiny::observe(
     {
-      running <- status_async(target) == "running"
+      running <- task$current_status() == "running"
       if (running != was_running) {
         was_running <<- running
         bslib::update_task_button(
@@ -74,7 +77,7 @@ bind_task_button_async <- function(target, task_button_id, session) {
         )
       }
     },
-    label = "update_task_button_state",
+    label = paste0(task$label, "$button"),
     priority = 1000,
     domain = session
   )

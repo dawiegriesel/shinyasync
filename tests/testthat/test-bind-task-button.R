@@ -14,7 +14,7 @@ local_button_log <- function(env = parent.frame()) {
 }
 
 test_that("a bound button is busy while the task runs and ready when it settles", {
-  skip_if_not_installed("bslib")
+  skip_if_not_installed("bslib", "0.7.0")
   local_pool()
   log <- local_button_log()
   shiny::testServer(function(input, output, session) {
@@ -35,7 +35,7 @@ test_that("a bound button is busy while the task runs and ready when it settles"
 })
 
 test_that("cancelling returns the button to ready", {
-  skip_if_not_installed("bslib")
+  skip_if_not_installed("bslib", "0.7.0")
   local_pool()
   log <- local_button_log()
   shiny::testServer(function(input, output, session) {
@@ -43,6 +43,7 @@ test_that("cancelling returns the button to ready", {
       Sys.sleep(5)
       input$n
     }) |> bindEvent(input$go) |> bslib::bind_task_button("go")
+    output$x <- shiny::renderText(sim())
   }, {
     session$setInputs(n = 1, go = 1)
     expect_equal(log$states, "go busy")
@@ -53,7 +54,7 @@ test_that("cancelling returns the button to ready", {
 })
 
 test_that("the methods return the object and cover every async class", {
-  skip_if_not_installed("bslib")
+  skip_if_not_installed("bslib", "0.7.0")
   local_pool()
   log <- local_button_log()
   shiny::testServer(function(input, output, session) {
@@ -68,4 +69,23 @@ test_that("the methods return the object and cover every async class", {
     wait_for(function() status_async(o) == "success" && status_async(v) == "success", session)
     expect_setequal(log$states, c("obs busy", "val busy", "obs ready", "val ready"))
   })
+})
+
+test_that("binding a button does not start an unread reactiveAsync()", {
+  skip_if_not_installed("bslib", "0.7.0")
+  local_pool()
+  log <- local_button_log()
+  shiny::testServer(function(input, output, session) {
+    r <- reactiveAsync(input$n) |> bslib::bind_task_button("go")
+  }, {
+    session$setInputs(n = 1)
+    expect_equal(log$states, character())
+    expect_equal(attr(r, "shinyasync")$current_status(), "idle")
+  })
+})
+
+test_that("binding outside a session fails at the call", {
+  skip_if_not_installed("bslib", "0.7.0")
+  r <- reactiveAsync(1)
+  expect_error(bslib::bind_task_button(r, "go"), "within a Shiny session")
 })

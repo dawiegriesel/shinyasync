@@ -45,8 +45,8 @@
 Methods for \code{\link[bslib:bind_task_button]{bslib::bind_task_button()}} so that a \code{\link[bslib:input_task_button]{bslib::input_task_button()}}
 shows its busy state while the task of a \code{\link[=reactiveAsync]{reactiveAsync()}}, \code{\link[=observeAsync]{observeAsync()}}
 or \code{\link[=reactiveValAsync]{reactiveValAsync()}} is \code{"running"} and returns to ready when it settles
-or is cancelled, as it does for an \code{ExtendedTask}. Reading the status
-starts a \code{\link[=reactiveAsync]{reactiveAsync()}} that has not run yet, as any status read does.
+or is cancelled, as it does for an \code{ExtendedTask}. Binding reads the task
+status without starting a \code{\link[=reactiveAsync]{reactiveAsync()}} that nothing has read yet.
 }
 \examples{
 if (interactive()) {
