@@ -1,4 +1,4 @@
-# shinyasync (development version)
+# shinyasync 0.3.0
 
 * The default pool size respects the CPU limits of the process's cgroup. It
   was one less than `parallel::detectCores()`, which reports the host's

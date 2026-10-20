@@ -1,6 +1,6 @@
 Package: shinyasync
 Title: Async Shiny Reactives on 'mirai'
-Version: 0.2.0.9000
+Version: 0.3.0
 Authors@R: 
     person("Dawie", "Griesel", , "dawiegr@gmail.com", role = c("aut", "cre"))
 Description: Move slow work off the 'Shiny' session thread without changing
