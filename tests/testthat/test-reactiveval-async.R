@@ -20,6 +20,13 @@ test_that("reactiveValAsync accepts plain values, mirai and promises", {
   })
 })
 
+test_that("values not made by an assignment get distinct labels", {
+  vals <- lapply(1:3, function(i) reactiveValAsync())
+  labels <- vapply(vals, function(v) attr(v, "shinyasync")$label, "")
+  expect_match(labels, "^reactiveValAsync#[0-9]+$")
+  expect_length(unique(labels), 3L)
+})
+
 test_that("a newer task supersedes an older one", {
   local_pool()
   shiny::testServer(function(input, output, session) {
@@ -62,7 +69,7 @@ test_that("the label is the name the value is assigned to", {
   expect_equal(attr(env$report, "shinyasync")$label, "report")
   expect_equal(attr(env$x, "shinyasync")$label, "x")
   eval(parse(text = "plain <- reactiveValAsync()", keep.source = FALSE), env)
-  expect_equal(attr(env$plain, "shinyasync")$label, "reactiveValAsync")
+  expect_match(attr(env$plain, "shinyasync")$label, "^reactiveValAsync#[0-9]+$")
   named <- reactiveValAsync(label = "mine")
   expect_equal(attr(named, "shinyasync")$label, "mine")
 })

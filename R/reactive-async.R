@@ -146,9 +146,18 @@ default_label <- function(fn, expr) {
 # otherwise, or when the call is not the whole right-hand side, `default`.
 assign_label <- function(call, default) {
   srcref <- attr(call, "srcref", exact = TRUE)
-  if (is.null(srcref)) return(default)
+  if (is.null(srcref)) return(unique_label(default))
   text <- tryCatch(paste(as.character(srcref), collapse = "\n"), error = function(e) "")
   m <- regmatches(text, regexec("^\\s*([^[:space:]]+)\\s*(<<-|<-|=)\\s*reactiveValAsync\\b", text))[[1]]
-  if (length(m) < 2L) return(default)
+  if (length(m) < 2L) return(unique_label(default))
   m[2]
+}
+
+# A value not created by an assignment, as in lapply(), gets a label that is
+# unique in the process, as shiny::reactiveVal() falls back to one.
+label_counter <- new.env(parent = emptyenv())
+unique_label <- function(default) {
+  n <- (label_counter[[default]] %||% 0L) + 1L
+  label_counter[[default]] <- n
+  paste0(default, "#", n)
 }
