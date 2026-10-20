@@ -21,8 +21,18 @@ what the layer removes and what it costs.
 The running example is the surf forecast dashboard from
 [shinyasync-example](https://github.com/dawiegriesel/shinyasync-example).
 `fetch_marine()` and `fetch_wind()` call Open-Meteo for a spot and return a
-data frame of hourly conditions; `score()` combines the two into a surf score.
-They are plain functions defined in the app's `R/` directory.
+data frame of hourly conditions; `score_hours()` combines the two into a surf
+score. They are plain functions defined in the app's `R/` directory.
+
+The code here shortens their signatures so the two shapes stay side by side.
+In the app `fetch_marine(lat, lon, days, delay)` and `fetch_wind()` take the
+coordinates from `get_spot(input$spot)` and the day count and simulated
+latency from two more inputs, `score_hours(marine, wind, spot)` takes the
+spot as well, and the simulation is `simulate_scores(scored, spot, n, delay)`.
+`simulate_band()`, `write_cache()`, `save_favourite()` and
+`fetch_and_score()` stand in for app helpers of the same shape; the app
+ranks all spots in one `rank_spots(spots, days)` task rather than one per
+spot.
 
 ```{r setup}
 library(shiny)
@@ -63,19 +73,19 @@ is not given, so the helper is passed in by name too.
 
 ```{r fetch-et}
 # ExtendedTask
-swell_task <- ExtendedTask$new(function(spot) {
+marine_task <- ExtendedTask$new(function(spot) {
   mirai(fetch_marine(spot), spot = spot, fetch_marine = fetch_marine)
 })
-observe(swell_task$invoke(input$spot))
+observe(marine_task$invoke(input$spot))
 
-output$swell <- renderPlot(plot_swell(swell_task$result()))
+output$marine <- renderPlot(plot_swell(marine_task$result()))
 ```
 
 ```{r fetch-sa}
 # shinyasync
-swell <- reactiveAsync(fetch_marine(input$spot))
+marine <- reactiveAsync(fetch_marine(input$spot))
 
-output$swell <- renderPlot(plot_swell(swell()))
+output$marine <- renderPlot(plot_swell(marine()))
 ```
 
 `reactiveAsync()` reads `input$spot` on the session thread, where it
@@ -98,12 +108,12 @@ and in what happens to the previous value.
 
 ```{r status-et}
 # ExtendedTask
-output$status <- renderText(swell_task$status())    # "initial" before the first invoke
+output$status <- renderText(marine_task$status())    # "initial" before the first invoke
 ```
 
 ```{r status-sa}
 # shinyasync
-output$status <- renderText(status_async(swell))    # "idle" before the first run
+output$status <- renderText(status_async(marine))    # "idle" before the first run
 ```
 
 `invoke()` clears the stored value, and while the task runs `result()` halts
@@ -117,8 +127,8 @@ refresh, which wants a note:
 ```{r note-sa}
 # shinyasync
 output$note <- renderUI({
-  running <- status_async(swell) == "running"
-  if (running && !has_value_async(swell)) icon("spinner", class = "fa-spin")
+  running <- status_async(marine) == "running"
+  if (running && !has_value_async(marine)) icon("spinner", class = "fa-spin")
   else if (running) span(class = "text-muted", "Showing the previous forecast")
 })
 ```
@@ -138,13 +148,13 @@ resolves the task with an error:
 ```{r button-et}
 # ExtendedTask
 current <- NULL
-sim_task <- ExtendedTask$new(function(spot, swell, wind) {
-  current <<- mirai(simulate_band(spot, swell, wind), spot = spot, swell = swell,
+sim_task <- ExtendedTask$new(function(spot, marine, wind) {
+  current <<- mirai(simulate_band(spot, marine, wind), spot = spot, marine = marine,
                     wind = wind, simulate_band = simulate_band)
   current
 }) |> bslib::bind_task_button("go")
 
-observe(sim_task$invoke(input$spot, swell_task$result(), wind_task$result())) |>
+observe(sim_task$invoke(input$spot, marine_task$result(), wind_task$result())) |>
   bindEvent(input$go)
 observe(stop_mirai(current)) |> bindEvent(input$cancel)
 
@@ -158,7 +168,7 @@ storing the last good value in a `reactiveVal` of your own.
 
 ```{r button-sa}
 # shinyasync
-sim <- reactiveAsync(simulate_band(input$spot, swell(), wind())) |>
+sim <- reactiveAsync(simulate_band(input$spot, marine(), wind())) |>
   bindEvent(input$go) |>
   bslib::bind_task_button("go")
 observe(cancel_async(sim)) |> bindEvent(input$cancel)
@@ -186,7 +196,7 @@ finished. A plain `reactive()` would only ever compute the latest.
 
 ```{r latest-sa}
 # shinyasync
-swell <- reactiveAsync(fetch_marine(input$spot))                        # cancels, runs latest
+marine <- reactiveAsync(fetch_marine(input$spot))                        # cancels, runs latest
 saved <- reactiveAsync(save_favourite(input$favourite), mode = "queue")  # runs every one
 
 output$saved <- renderText(saved())
@@ -202,34 +212,34 @@ queue mode: a dependency change cancels its running task.
 ## A task that depends on another
 
 The score needs both forecasts. In plain Shiny it is
-`reactive(score(swell(), wind()))`.
+`reactive(score_hours(marine(), wind()))`.
 
 With `ExtendedTask` the score is a third task, invoked from an observer that
 reads the first two. `result()` halts while a fetch is running, so the
-observer never pairs a new swell with an old wind, which is right. But the
-score task is not told: while both fetches run for the new spot it still
+observer never pairs a new marine forecast with an old wind, which is right.
+But the score task is not told: while both fetches run for the new spot it still
 reports `"success"` and `result()` still returns the old spot's score, so a
 status badge on the score says it is done when it is about to change, and
 nothing downstream can tell the difference.
 
 ```{r chain-et}
 # ExtendedTask
-score_task <- ExtendedTask$new(function(swell, wind) {
-  mirai(score(swell, wind), swell = swell, wind = wind, score = score)
+score_task <- ExtendedTask$new(function(marine, wind) {
+  mirai(score_hours(marine, wind), marine = marine, wind = wind, score_hours = score_hours)
 })
-observe(score_task$invoke(swell_task$result(), wind_task$result()))
+observe(score_task$invoke(marine_task$result(), wind_task$result()))
 
 output$score <- renderText(score_task$result())
 ```
 
 ```{r chain-sa}
 # shinyasync
-scored <- reactiveAsync(score(swell(), wind()))
+scored <- reactiveAsync(score_hours(marine(), wind()))
 
 output$score <- renderText(scored())
 ```
 
-An async reactive that reads another one waits for it: while `swell` is
+An async reactive that reads another one waits for it: while `marine` is
 catching up with a new spot, `scored` keeps its previous value, reports
 `"running"` for as long as either fetch does, and runs once on the settled
 pair. The expression is the one you

@@ -1,5 +1,9 @@
 # shinyasync (development version)
 
+* `vignette("extendedtask")` says up front that it shortens the example
+  app's helper signatures, names the real ones once, and uses the app's
+  `marine` and `score_hours()` names, so a reader who opens the app after
+  the vignette finds what it describes (#28).
 * `bslib::bind_task_button()` gains methods for `reactiveAsync()`,
   `observeAsync()` and `reactiveValAsync()`, so an `input_task_button()`
   is busy while the task runs and ready when it settles or is cancelled, as
