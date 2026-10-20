@@ -73,7 +73,8 @@ sent along once, as a task's globals are; packages attached in the session
 and used by the expression are attached on the workers. The names it
 assigns and the objects sent with it are \emph{resident}: dependency capture
 leaves them out of what a task ships, even if the session has an object of
-the same name, and \code{print()} lists them on a \code{resident} line.
+the same name and whether the expression uses them directly or through a
+helper it ships, and \code{print()} lists them on a \code{resident} line.
 
 Call it at the top level of \code{app.R}, so the preload runs once per process
 and the pool, with its connections, lives until the app stops. Called in

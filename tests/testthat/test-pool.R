@@ -142,6 +142,27 @@ test_that("everywhere preloads every worker and resident names are not shipped",
   expect_length(d$shipped, 0)
 })
 
+test_that("a resident reached through a shipped helper is listed, checked and not shipped", {
+  skip_if(mirai::daemons_set(), "daemons already set")
+  withr::defer(reset_pool())
+  om_base <- "session copy"
+  om_get <- function(path) paste(om_base, path)
+  fetch_marine <- function(spot) om_get(spot)
+  pool_async(workers = 1, everywhere = om_base <- "worker copy")
+
+  capture <- new_capture(quote(fetch_marine("muizenberg")), environment())
+  d <- capture$describe()
+  expect_equal(d$resident, "om_base")
+  expect_equal(names(d$shipped), "fetch_marine")
+  helper_env <- environment(d$shipped$fetch_marine)
+  expect_true(exists("om_get", envir = helper_env, inherits = FALSE))
+  expect_false(exists("om_base", envir = helper_env, inherits = FALSE))
+
+  job <- capture$resolve()
+  expect_match(paste(deparse(job$expr), collapse = " "), "om_base.*was not preloaded")
+  expect_equal(mirai_async(fetch_marine("muizenberg"))[], "worker copy muizenberg")
+})
+
 test_that("a restarted pool is preloaded again", {
   skip_if(mirai::daemons_set(), "daemons already set")
   withr::defer(reset_pool())

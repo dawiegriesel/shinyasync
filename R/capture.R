@@ -76,14 +76,14 @@ new_capture <- function(expr, env, globals = NULL) {
     })
     names(args) <- analysis$placeholders
     if (upstream_stale(self)) waiting_halt()
-    resident <- intersect(pool_residents(), c(analysis$free, analysis$soft))
-    skip <- c(analysis$placeholders, names(globals), resident)
+    skip <- c(analysis$placeholders, names(globals))
     deps <- collect_globals(
       setdiff(analysis$free, skip), env,
-      soft = setdiff(analysis$soft, skip), cache = fn_cache
+      soft = setdiff(analysis$soft, skip), cache = fn_cache,
+      resident = pool_residents()
     )
     list(
-      expr = worker_expr(analysis$expr, deps$pkgs, resident),
+      expr = worker_expr(analysis$expr, deps$pkgs, deps$resident),
       args = args,
       globals = c(deps$values, globals),
       inputs = inputs(args)
@@ -101,22 +101,25 @@ new_capture <- function(expr, env, globals = NULL) {
     if (inherits(a, "error")) {
       return(list(error = conditionMessage(a)))
     }
-    resident <- intersect(pool_residents(), c(a$free, a$soft))
-    skip <- c(a$placeholders, names(globals), resident)
+    skip <- c(a$placeholders, names(globals))
     deps <- tryCatch(
       collect_globals(
         setdiff(a$free, skip), env,
-        soft = setdiff(a$soft, skip), cache = fn_cache
+        soft = setdiff(a$soft, skip), cache = fn_cache,
+        resident = pool_residents()
       ),
       error = identity
     )
     if (inherits(deps, "error")) {
-      deps <- list(values = list(), pkgs = character(), error = conditionMessage(deps))
+      deps <- list(
+        values = list(), pkgs = character(), resident = character(),
+        error = conditionMessage(deps)
+      )
     }
     list(
       hoisted = a$keys,
       shipped = deps$values,
-      resident = resident,
+      resident = deps$resident,
       globals = globals,
       pkgs = deps$pkgs,
       expr = a$expr,
@@ -439,11 +442,16 @@ shiny_fn_name <- function(head, env, locals = character()) {
 # attach there. Helper closures are rebound to a copy of their defining
 # environment that holds only what they use, so closures from different scopes
 # keep their own bindings and nothing drags the session along.
-collect_globals <- function(names, env, soft = character(), cache = NULL) {
+# `resident` names, made resident on every worker by pool_async(everywhere = ),
+# are not shipped, whether the expression uses them directly or a shipped
+# helper does; the ones met are returned so a run can check for them first.
+collect_globals <- function(names, env, soft = character(), cache = NULL,
+                            resident = character()) {
   if (!is.character(names)) names <- free_names(names)
   values <- list()
   pkgs <- character()
   clones <- list()
+  met <- character()
 
   clone_for <- function(src) {
     for (entry in clones) if (identical(entry$src, src)) return(entry$clone)
@@ -453,6 +461,10 @@ collect_globals <- function(names, env, soft = character(), cache = NULL) {
   }
 
   classify <- function(name, from, soft = FALSE) {
+    if (name %in% resident) {
+      met <<- c(met, name)
+      return(NULL)
+    }
     hit <- lookup(name, from)
     if (!hit$found) return(NULL)
     where <- hit$env
@@ -513,7 +525,11 @@ collect_globals <- function(names, env, soft = character(), cache = NULL) {
     if (!is.null(r)) values[name] <- r
   }
 
-  list(values = values, pkgs = setdiff(unique(pkgs), "base"))
+  list(
+    values = values,
+    pkgs = setdiff(unique(pkgs), "base"),
+    resident = resident[resident %in% met]
+  )
 }
 
 closure_free_names <- function(f, name, cache) {

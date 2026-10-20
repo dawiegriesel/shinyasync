@@ -55,7 +55,8 @@ pool_state$preload <- NULL
 #' and used by the expression are attached on the workers. The names it
 #' assigns and the objects sent with it are *resident*: dependency capture
 #' leaves them out of what a task ships, even if the session has an object of
-#' the same name, and `print()` lists them on a `resident` line.
+#' the same name and whether the expression uses them directly or through a
+#' helper it ships, and `print()` lists them on a `resident` line.
 #'
 #' Call it at the top level of `app.R`, so the preload runs once per process
 #' and the pool, with its connections, lives until the app stops. Called in

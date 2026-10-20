@@ -1,5 +1,11 @@
 # shinyasync (development version)
 
+* A resident name reached only through a shipped helper is now left out of
+  what a task ships, checked for on the worker before the run, and listed on
+  the `resident` line of `print()`. It was shipped on every run inside the
+  helper's environment, so a connection or template that `pool_async(everywhere = )`
+  made resident for a helper to use was sent again with each task and never
+  appeared in the print (#27).
 * A `reactiveValAsync()` not created by an assignment, as in `lapply()`, gets
   a default label that is unique in the process, as `shiny::reactiveVal()`
   does, so such values can be told apart in reactlog. Values assigned to a
