@@ -245,6 +245,10 @@ Reactive read that is `TRUE` when reading `r` would return a value rather than h
 
 Stops the running task, if any, and drops queued tasks. The last successful value is kept and the status becomes `"idle"`, so `has_value_async()` stays `TRUE`; a `bindEvent()` task stays in that state until its next event, and an event still waiting for an upstream async reactive is dropped.
 
+### `bind_task_button(target, task_button_id)`
+
+Methods for bslib's `bind_task_button()`, so `reactiveAsync() |> bindEvent(input$go) |> bind_task_button("go")` keeps an `input_task_button()` busy while the task runs and returns it to ready when the task settles or is cancelled, as for an `ExtendedTask`. Works on `observeAsync()` and `reactiveValAsync()` too.
+
 ### `pool_async(workers = NULL, ..., everywhere = NULL)`
 
 Starts a `mirai` daemon pool shared by every session in the R process. Optional: the first task that runs without daemons starts one with the defaults and says so. The pool is reference-counted: each session that calls it holds it until the session ends, a call outside a session holds it until the app stops, and the pool shuts down when the last holder releases it. `...` passes through to `mirai::daemons()`, so remote or TLS-backed pools work as usual. `everywhere` is an expression run once on every worker when the pool starts, for data, models and connections that every task needs; see [Preloading the workers](#preloading-the-workers). If you already manage `daemons()` yourself, skip this.

@@ -23,6 +23,7 @@ reference:
   - status_async
   - has_value_async
   - cancel_async
+  - bind_task_button
 - title: Daemon pool
   contents:
   - pool_async

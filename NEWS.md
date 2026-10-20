@@ -1,5 +1,10 @@
 # shinyasync (development version)
 
+* `bslib::bind_task_button()` gains methods for `reactiveAsync()`,
+  `observeAsync()` and `reactiveValAsync()`, so an `input_task_button()`
+  is busy while the task runs and ready when it settles or is cancelled, as
+  for an `ExtendedTask`. The conversion from `ExtendedTask` no longer needs a
+  hand-written observer calling `update_task_button()` (#26).
 * A resident name reached only through a shipped helper is now left out of
   what a task ships, checked for on the worker before the run, and listed on
   the `resident` line of `print()`. It was shipped on every run inside the

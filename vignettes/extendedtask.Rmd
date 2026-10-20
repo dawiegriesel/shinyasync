@@ -130,7 +130,8 @@ should be able to stop it.
 
 `ExtendedTask` has a good story for the button: `bslib::input_task_button()`
 and `bind_task_button()` disable the button while the task runs, with no code
-in the server. It has no story for cancelling. The task does not expose its
+in the server. shinyasync registers methods for the same generic, so that
+line carries over. `ExtendedTask` has no story for cancelling. The task does not expose its
 mirai, so to stop it you keep a reference yourself, and `stop_mirai()` then
 resolves the task with an error:
 
@@ -158,16 +159,18 @@ storing the last good value in a `reactiveVal` of your own.
 ```{r button-sa}
 # shinyasync
 sim <- reactiveAsync(simulate_band(input$spot, swell(), wind())) |>
-  bindEvent(input$go)
+  bindEvent(input$go) |>
+  bslib::bind_task_button("go")
 observe(cancel_async(sim)) |> bindEvent(input$cancel)
 
 output$band <- renderPlot(plot_band(sim()))
 ```
 
-`bindEvent()` works on an async reactive as on a plain one. `cancel_async()`
-stops the worker, sets the status to `"idle"` and keeps the last band, so
-`has_value_async()` stays `TRUE` and the output does not change until the
-next click. A button that disables itself reads the status:
+`bindEvent()` and `bind_task_button()` work on an async reactive as on an
+`ExtendedTask`. `cancel_async()` stops the worker, sets the status to
+`"idle"` and keeps the last band, so `has_value_async()` stays `TRUE`, the
+output does not change until the next click, and the button returns to
+ready. Without bslib, a plain button that disables itself reads the status:
 
 ```{r button-ui-sa}
 # shinyasync
@@ -299,8 +302,8 @@ likely to meet:
 - The task must be a mirai. `ExtendedTask` accepts any promise, so a
   `future`, `callr` or `httr2::req_perform_promise()` task needs
   `ExtendedTask`, or `reactiveValAsync()` fed by hand.
-- `bind_task_button()` and the OpenTelemetry spans Shiny records for an
-  `ExtendedTask` have no counterpart here yet.
+- The OpenTelemetry spans Shiny records for an `ExtendedTask` have no
+  counterpart here yet.
 
 ## Summary
 
@@ -312,6 +315,7 @@ likely to meet:
 | Input changes while running | queued | cancelled and re-run (`mode = "queue"` to queue) |
 | Previous value while running | cleared; output greyed out | kept; `has_value_async()` tells first run from refresh |
 | Cancel | keep the mirai yourself; task ends in `"error"` | `cancel_async()`; status `"idle"`, value kept |
+| Task button | `bind_task_button()` | `bind_task_button()` |
 | Depends on another task | another task and observer | read it in the expression |
 | Side effect | task nobody reads, plus observer | `observeAsync()` |
 | Task source | any promise | mirai |
