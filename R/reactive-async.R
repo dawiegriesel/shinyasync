@@ -145,7 +145,8 @@ default_label <- function(fn, expr) {
 # reference rides on the innermost call that R attaches one to, when the code
 # was parsed with keep.source. Under a pipe that is the outer call, so
 # `ranking <- reactiveValAsync() |> bind_task_button("rank")` is read from the
-# bind_task_button() frame. Without a reference, or when the statement is not
+# bind_task_button() frame, past the inner frames whose references are the
+# generic's own lines. Without a reference, or when the statement is not
 # an assignment of the call, the label is a unique one.
 assign_label <- function(calls, default) {
   for (call in rev(calls)) {
@@ -153,8 +154,7 @@ assign_label <- function(calls, default) {
     if (is.null(srcref)) next
     text <- tryCatch(paste(as.character(srcref), collapse = "\n"), error = function(e) "")
     m <- regmatches(text, regexec("^\\s*([^[:space:]]+)\\s*(<<-|<-|=)\\s*reactiveValAsync\\b", text))[[1]]
-    if (length(m) < 2L) break
-    return(m[2])
+    if (length(m) >= 2L) return(m[2])
   }
   unique_label(default)
 }

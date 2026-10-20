@@ -70,6 +70,12 @@ test_that("the label is the name the value is assigned to", {
   expect_equal(attr(env$x, "shinyasync")$label, "x")
   eval(parse(text = "ranked <- reactiveValAsync() |> identity()", keep.source = TRUE), env)
   expect_equal(attr(env$ranked, "shinyasync")$label, "ranked")
+  # Under an S3 generic, as bslib::bind_task_button() is, the innermost frame
+  # carries the generic's UseMethod() line as its srcref.
+  env$via_generic <- function(x, ...) UseMethod("via_generic")
+  env$via_generic.default <- function(x, ...) x
+  eval(parse(text = "bound <- reactiveValAsync() |> via_generic()", keep.source = TRUE), env)
+  expect_equal(attr(env$bound, "shinyasync")$label, "bound")
   eval(parse(text = "plain <- reactiveValAsync()", keep.source = FALSE), env)
   expect_match(attr(env$plain, "shinyasync")$label, "^reactiveValAsync#[0-9]+$")
   named <- reactiveValAsync(label = "mine")
