@@ -1,3 +1,5 @@
+# shinyasync (development version)
+
 # shinyasync 0.4.0
 
 * `vignette("extendedtask")` says up front that it shortens the example
