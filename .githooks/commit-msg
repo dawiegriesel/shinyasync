@@ -1,0 +1,8 @@
+#!/bin/sh
+# Refuse a commit message that credits a coding agent through a trailer or
+# generated-with line; see CLAUDE.md "Workflow".
+if grep -Eiq '^(Co-Authored-By|Claude-Session|Generated-By):.*|Generated with \[?Claude|anthropic\.com' "$1"; then
+  echo "commit-msg: the message credits a coding agent; remove the line." >&2
+  grep -Ein 'Co-Authored-By|Claude-Session|Generated|anthropic\.com' "$1" >&2
+  exit 1
+fi

@@ -1,0 +1,13 @@
+#!/bin/sh
+# Refuse a commit whose author or committer is a coding agent. Every commit in
+# this repository is credited to a person; see CLAUDE.md "Workflow".
+author=$(git var GIT_AUTHOR_IDENT)
+committer=$(git var GIT_COMMITTER_IDENT)
+for ident in "$author" "$committer"; do
+  case "$ident" in
+    *anthropic.com*|*[Cc]laude*|*[Cc]opilot*|*noreply@github.com*)
+      echo "pre-commit: refusing to commit as '$ident'." >&2
+      echo "Set user.name and user.email to the person making the commit." >&2
+      exit 1 ;;
+  esac
+done
