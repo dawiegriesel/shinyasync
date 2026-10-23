@@ -425,31 +425,33 @@ async_arg_object <- function(arg, env, locals) {
 }
 
 async_fn_name <- function(head, env, locals = character()) {
-  if (is.call(head) && identical(head[[1]], quote(`::`)) &&
-      identical(head[[2]], quote(shinyasync)) && as.character(head[[3]]) %in% async_fns) {
-    return(as.character(head[[3]]))
-  }
-  if (is.symbol(head) && as.character(head) %in% async_fns &&
-      !as.character(head) %in% locals) {
-    name <- as.character(head)
-    hit <- lookup(name, env, mode = "function")
-    if (hit$found && identical(hit$value, getExportedValue("shinyasync", name))) return(name)
-  }
-  NULL
+  exported_fn_name(head, "shinyasync", async_fns, env, locals)
 }
 
 shiny_fn_name <- function(head, env, locals = character()) {
-  if (is.call(head) && identical(head[[1]], quote(`::`)) &&
-      identical(head[[2]], quote(shiny)) && as.character(head[[3]]) %in% session_fns) {
-    return(as.character(head[[3]]))
+  exported_fn_name(head, "shiny", session_fns, env, locals)
+}
+
+# The name in `fns` that the head of a call refers to, if it is one of
+# `pkg`'s exports: written as `pkg::fn`, as a bare `fn` bound to that export,
+# or as a field of a list or environment holding it, `mod$fn` or
+# `mod[["fn"]]`, which is how box::use(shiny) binds them. NULL otherwise.
+exported_fn_name <- function(head, pkg, fns, env, locals) {
+  if (is.call(head) && identical(head[[1]], quote(`::`))) {
+    if (identical(head[[2]], as.name(pkg)) && as.character(head[[3]]) %in% fns) {
+      return(as.character(head[[3]]))
+    }
+    return(NULL)
   }
-  if (is.symbol(head) && as.character(head) %in% session_fns &&
-      !as.character(head) %in% locals) {
-    name <- as.character(head)
-    hit <- lookup(name, env, mode = "function")
-    if (hit$found && identical(hit$value, getExportedValue("shiny", name))) return(name)
+  name <- if (is.symbol(head)) {
+    as.character(head)
+  } else if (is.call(head) && length(head) == 3L) {
+    key <- head[[3]]
+    if (is.character(key) || is.symbol(key)) as.character(key)
   }
-  NULL
+  if (is.null(name) || !name %in% fns) return(NULL)
+  obj <- async_arg_object(head, env, locals)
+  if (is.function(obj) && identical(obj, getExportedValue(pkg, name))) name
 }
 
 # Globals ------------------------------------------------------------------

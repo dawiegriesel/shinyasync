@@ -323,3 +323,33 @@ test_that("the unresolved-function warning reaches the worker error", {
     expect_error(shiny::isolate(r()), "no_such_fn")
   })
 })
+
+test_that("session calls through a module object, as box::use(shiny) binds them, are hoisted", {
+  input <- shiny::reactiveValues(n = 5, seed = 1)
+  # The shape box::use(shiny) and box::use(shinyasync) leave in the caller:
+  # an environment whose fields are the package's exports.
+  shiny <- new.env()
+  for (nm in session_fns) assign(nm, getExportedValue("shiny", nm), envir = shiny)
+  shinyasync <- list(status_async = status_async, has_value_async = has_value_async)
+  up <- reactiveAsync(1)
+  a <- analyze_expr(quote({
+    shiny$req(input$n)
+    shiny$validate(shiny$need(input$n > 0, "positive"))
+    shiny$isolate(input$seed) + shinyasync$status_async(up) + shiny[["isolate"]](input$n)
+  }), environment())
+
+  expect_equal(a$hoisted[[1]], quote(shiny$req(input$n)))
+  expect_equal(a$hoisted[[2]], quote(shiny$validate(shiny$need(input$n > 0, "positive"))))
+  expect_equal(a$hoisted[[3]], quote(shiny$isolate(input$seed)))
+  expect_equal(a$hoisted[[4]], quote(shinyasync$status_async(up)))
+  expect_equal(a$hoisted[[5]], quote(shiny[["isolate"]](input$n)))
+  expect_equal(names(a$inputs), "input$n")
+  expect_false(any(c("shiny", "shinyasync", "up") %in% a$free))
+
+  # A module object with a same-named field that is not the shiny function
+  # is an ordinary call and runs in the worker.
+  other <- list(req = function(x) x)
+  a <- analyze_expr(quote(other$req(input$n)), environment())
+  expect_equal(a$hoisted, list(quote(input$n)))
+  expect_true("other" %in% a$free)
+})

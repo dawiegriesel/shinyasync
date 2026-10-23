@@ -13,6 +13,11 @@
   function and the fix (attach the package in the session or use
   `pkg::fn()`), instead of failing on the worker after the task has run.
   `print()` lists such functions on a `missing` line.
+* `req()`, `validate()`, `invalidateLater()`, `isolate()`, `status_async()`
+  and `has_value_async()` are recognised when called through a module
+  object, as `shiny$req()` or `shinyasync$status_async()`, which is how
+  `box::use(shiny)` binds them in box and rhino apps. Before, such calls ran
+  on the worker, and `shiny$isolate()` did not isolate its read.
 
 ## Bug fixes
 

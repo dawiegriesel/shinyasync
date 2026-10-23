@@ -255,7 +255,7 @@ Starts a `mirai` daemon pool shared by every session in the R process. Optional:
 
 ## How dependency capture works
 
-An async expression is split in two. Reactive reads that appear literally in it, such as `input$x`, `input[["x"]]`, `rv$y`, `data()` or `mod$data()`, are evaluated on the session thread, where they register dependencies as usual. Their values, together with any user-defined functions and objects the expression refers to, are sent to a worker that evaluates the rest. Packages attached in the session and used by the expression, directly or through a helper it ships, are attached in the worker.
+An async expression is split in two. Reactive reads that appear literally in it, such as `input$x`, `input[["x"]]`, `rv$y`, `data()` or `mod$data()`, are evaluated on the session thread, where they register dependencies as usual. So are `req()`, `validate()`, `invalidateLater()`, `isolate()`, `status_async()` and `has_value_async()`, whether written bare, as `shiny::req()`, or through a module object as `shiny$req()`, the form `box::use(shiny)` gives. Their values, together with any user-defined functions and objects the expression refers to, are sent to a worker that evaluates the rest. Packages attached in the session and used by the expression, directly or through a helper it ships, are attached in the worker.
 
 `print(r)` shows the split for an async reactive: the calls evaluated on the
 session, the objects and packages shipped to the worker, and the rewritten
