@@ -21,6 +21,8 @@ new_capture <- function(expr, env, globals = NULL) {
   # Free names of helper closures, so findGlobals() runs once per helper
   # rather than on every invalidation.
   fn_cache <- new.env(parent = emptyenv())
+  # Unresolved functions already warned about, so each warns once per capture.
+  warned <- character()
 
   # Analysed on first use, so reactives defined later in server() resolve.
   analyze <- function() {
@@ -80,8 +82,15 @@ new_capture <- function(expr, env, globals = NULL) {
     deps <- collect_globals(
       setdiff(analysis$free, skip), env,
       soft = setdiff(analysis$soft, skip), cache = fn_cache,
-      resident = pool_residents()
+      resident = pool_residents(), calls = analysis$calls
     )
+    # The worker would fail with "could not find function" after the task
+    # has run; say so now. A warning, not an error: user-managed daemons may
+    # define the name with everywhere().
+    for (name in setdiff(deps$missing, warned)) {
+      warned <<- c(warned, name)
+      warning(missing_fn_message(name), call. = FALSE)
+    }
     list(
       expr = worker_expr(analysis$expr, deps$pkgs, deps$resident),
       args = args,
@@ -106,7 +115,7 @@ new_capture <- function(expr, env, globals = NULL) {
       collect_globals(
         setdiff(a$free, skip), env,
         soft = setdiff(a$soft, skip), cache = fn_cache,
-        resident = pool_residents()
+        resident = pool_residents(), calls = a$calls
       ),
       error = identity
     )
@@ -123,6 +132,7 @@ new_capture <- function(expr, env, globals = NULL) {
       hoisted = a$keys,
       shipped = deps$values,
       resident = deps$resident,
+      missing = deps$missing,
       globals = globals,
       pkgs = deps$pkgs,
       expr = a$expr,
@@ -137,7 +147,8 @@ new_capture <- function(expr, env, globals = NULL) {
 # calls with their placeholder names, the reactive reads that make up a
 # result's provenance (`inputs`), the free names the worker needs (`free`),
 # and names that appear in formulas (`soft`), which are shipped only if they
-# resolve to a plain object.
+# resolve to a plain object. `calls` are the free names in call position: an
+# unresolved one is a function the worker will not find.
 analyze_expr <- function(expr, env) {
   hoisted <- list()
   keys <- character()
@@ -288,7 +299,8 @@ analyze_expr <- function(expr, env) {
   # Hoisted calls never use expression locals, so no shadowing to respect here.
   for (x in hoisted) track_reads(x)
   placeholders <- if (length(keys)) paste0(".sa_", seq_along(keys)) else character()
-  free <- setdiff(unique(c(free_names(rewritten), roots)), placeholders)
+  names <- free_names(rewritten, split = TRUE)
+  free <- setdiff(unique(c(names$all, roots)), placeholders)
   list(
     expr = rewritten,
     hoisted = hoisted,
@@ -296,6 +308,7 @@ analyze_expr <- function(expr, env) {
     keys = keys,
     inputs = inputs,
     free = free,
+    calls = setdiff(names$functions, placeholders),
     soft = setdiff(unique(formula_names), c(free, placeholders)),
     reads_upstream = vapply(hoisted, reads_upstream, logical(1), env = env)
   )
@@ -448,13 +461,20 @@ shiny_fn_name <- function(head, env, locals = character()) {
 # `resident` names, made resident on every worker by pool_async(everywhere = ),
 # are not shipped, whether the expression uses them directly or a shipped
 # helper does; the ones met are returned so a run can check for them first.
+# `calls` are the names used as functions; those the session cannot resolve
+# are returned as `missing`.
 collect_globals <- function(names, env, soft = character(), cache = NULL,
-                            resident = character()) {
-  if (!is.character(names)) names <- free_names(names)
+                            resident = character(), calls = NULL) {
+  if (!is.character(names)) {
+    split <- free_names(names, split = TRUE)
+    names <- split$all
+    calls <- calls %||% split$functions
+  }
   values <- list()
   pkgs <- character()
   clones <- list()
   met <- character()
+  missing <- character()
 
   clone_for <- function(src) {
     for (entry in clones) if (identical(entry$src, src)) return(entry$clone)
@@ -463,13 +483,16 @@ collect_globals <- function(names, env, soft = character(), cache = NULL,
     clone
   }
 
-  classify <- function(name, from, soft = FALSE) {
+  classify <- function(name, from, soft = FALSE, call = name %in% calls) {
     if (name %in% resident) {
       met <<- c(met, name)
       return(NULL)
     }
     hit <- lookup(name, from)
-    if (!hit$found) return(NULL)
+    if (!hit$found) {
+      if (call) missing <<- c(missing, name)
+      return(NULL)
+    }
     where <- hit$env
 
     if (identical(where, baseenv()) || identical(where, .BaseNamespaceEnv)) return(NULL)
@@ -511,9 +534,9 @@ collect_globals <- function(names, env, soft = character(), cache = NULL,
     environment(f) <- clone
     # Bind before resolving dependencies so recursive helpers terminate.
     assign(name, f, envir = clone)
-    for (nm in fnames) {
+    for (nm in fnames$all) {
       if (exists(nm, envir = clone, inherits = FALSE)) next
-      r <- classify(nm, src)
+      r <- classify(nm, src, call = nm %in% fnames$functions)
       if (!is.null(r)) assign(nm, r[[1]], envir = clone)
     }
     f
@@ -531,26 +554,38 @@ collect_globals <- function(names, env, soft = character(), cache = NULL,
   list(
     values = values,
     pkgs = setdiff(unique(pkgs), "base"),
-    resident = resident[resident %in% met]
+    resident = resident[resident %in% met],
+    missing = unique(missing)
   )
 }
 
 closure_free_names <- function(f, name, cache) {
-  if (is.null(cache)) return(free_names(f))
+  if (is.null(cache)) return(free_names(f, split = TRUE))
   hit <- cache[[name]]
   if (!is.null(hit) && identical(hit$fn, f)) return(hit$names)
-  names <- free_names(f)
+  names <- free_names(f, split = TRUE)
   cache[[name]] <- list(fn = f, names = names)
   names
 }
 
-free_names <- function(x) {
+# The free names of a function or expression; with `split`, also the subset
+# used in call position.
+free_names <- function(x, split = FALSE) {
   if (!is.function(x)) {
     f <- function() NULL
     body(f) <- x
     x <- f
   }
-  codetools::findGlobals(x, merge = TRUE)
+  if (!split) return(codetools::findGlobals(x, merge = TRUE))
+  g <- codetools::findGlobals(x, merge = FALSE)
+  list(all = unique(c(g$functions, g$variables)), functions = g$functions)
+}
+
+missing_fn_message <- function(name) {
+  sprintf(
+    "`%s()` is not defined in the session, so it cannot be sent to the worker. Attach its package with library() in the session, or call it as pkg::%s().",
+    name, name
+  )
 }
 
 # The expression a worker evaluates: `expr` after attaching `pkgs`. Names the

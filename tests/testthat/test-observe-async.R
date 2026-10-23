@@ -48,7 +48,7 @@ test_that("observeAsync reports worker and session-side errors", {
   }, {
     expect_message(
       {
-        session$setInputs(n = 1)
+        expect_warning(session$setInputs(n = 1), "no_such_function_xyz\\(\\)")
         wait_for(function() o$status() == "error", session)
       },
       "Error in typo: .*no_such_function_xyz"

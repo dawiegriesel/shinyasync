@@ -77,6 +77,12 @@ print_task <- function(task, expr = TRUE) {
   ))
   if (length(d$resident)) print_field("resident", d$resident)
   if (length(d$pkgs)) print_field("attached", d$pkgs)
+  if (length(d$missing)) {
+    print_field("missing", c(
+      cli::col_red(paste0(d$missing, "()")),
+      cli::col_grey("not defined in the session: attach the package or use pkg::fn()")
+    ))
+  }
 
   if (expr) {
     # The statements of a `{` block, one per line, without the braces.

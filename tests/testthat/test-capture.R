@@ -276,3 +276,50 @@ test_that("a self-shadowing assignment ships nothing and reads the reactive", {
     expect_equal(peek(r), 8)
   })
 })
+
+test_that("a function the session cannot resolve warns once and still dispatches", {
+  input <- shiny::reactiveValues(n = 1)
+  cap <- new_capture(quote(no_such_fn(input$n)), environment())
+  expect_warning(
+    job <- shiny::isolate(cap$resolve()),
+    "`no_such_fn\\(\\)` is not defined in the session.*library\\(\\).*pkg::no_such_fn\\(\\)"
+  )
+  expect_equal(job$args, list(.sa_1 = 1))
+  expect_silent(shiny::isolate(cap$resolve()))
+  expect_equal(cap$describe()$missing, "no_such_fn")
+})
+
+test_that("only unresolved names in call position warn", {
+  env <- new.env(parent = globalenv())
+  # Formula and data-mask symbols are values, not calls.
+  expect_silent(deps <- collect_globals(quote(lm(mpg ~ cyl, data = mtcars)), env))
+  expect_length(deps$missing, 0)
+  expect_silent(deps <- collect_globals(quote(stats::sd(x) + median(y)), env))
+  expect_length(deps$missing, 0)
+  deps <- collect_globals(quote(subset(mtcars, mpg > undefined_var)), env)
+  expect_length(deps$missing, 0)
+  deps <- collect_globals(quote(undefined_fn(1)), env, resident = "undefined_fn")
+  expect_length(deps$missing, 0)
+  deps <- collect_globals(quote(undefined_fn(1)), env)
+  expect_equal(deps$missing, "undefined_fn")
+})
+
+test_that("an unresolved function inside a shipped helper is reported", {
+  helper <- function(x) GET_nowhere(x)
+  cap <- new_capture(quote(helper(input$n)), environment())
+  input <- shiny::reactiveValues(n = 1)
+  expect_warning(shiny::isolate(cap$resolve()), "GET_nowhere\\(\\)")
+  expect_silent(shiny::isolate(cap$resolve()))
+})
+
+test_that("the unresolved-function warning reaches the worker error", {
+  local_pool()
+  shiny::testServer(function(input, output, session) {
+    r <- reactiveAsync(no_such_fn(input$n))
+    output$x <- shiny::renderText(r())
+  }, {
+    expect_warning(session$setInputs(n = 1), "no_such_fn\\(\\)")
+    wait_for(function() status_async(r) == "error", session)
+    expect_error(shiny::isolate(r()), "no_such_fn")
+  })
+})

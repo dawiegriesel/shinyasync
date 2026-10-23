@@ -255,7 +255,7 @@ Starts a `mirai` daemon pool shared by every session in the R process. Optional:
 
 ## How dependency capture works
 
-An async expression is split in two. Reactive reads that appear literally in it, such as `input$x`, `input[["x"]]`, `rv$y`, `data()` or `mod$data()`, are evaluated on the session thread, where they register dependencies as usual. Their values, together with any user-defined functions and objects the expression refers to, are sent to a worker that evaluates the rest. Packages attached in the session and used by the expression are attached in the worker.
+An async expression is split in two. Reactive reads that appear literally in it, such as `input$x`, `input[["x"]]`, `rv$y`, `data()` or `mod$data()`, are evaluated on the session thread, where they register dependencies as usual. Their values, together with any user-defined functions and objects the expression refers to, are sent to a worker that evaluates the rest. Packages attached in the session and used by the expression, directly or through a helper it ships, are attached in the worker.
 
 `print(r)` shows the split for an async reactive: the calls evaluated on the
 session, the objects and packages shipped to the worker, and the rewritten
@@ -279,6 +279,7 @@ print(r)
 
 Limits that follow from this:
 
+- **Packages must be attached in the session.** A function is found on the worker because the session found it: `GET()` is shipped as "attach httr" only if `library(httr)` ran in the session. A function the session cannot resolve warns on the first run, and `print()` lists it on a `missing` line; attach the package or write `httr::GET()`. Functions that only exist inside a data mask, such as `n()` in a `dplyr::summarise()` call when dplyr is not attached, trigger the same warning although they work.
 - **Reads must be literal.** Reads inside helper functions or with computed names (`input[[paste0("x", i)]]`) cannot be resolved. Read such values in a separate `reactive()` first, or pass them with `globals = list(...)`.
 - **Every read is a dependency**, even in a branch that is not taken: `if (input$a) input$b else 0` re-runs when `input$b` changes. Wrap a read in `isolate()` to use its value without depending on it.
 - **`req()` and `validate()` run on the session** only when they are certain to run, i.e. not inside `if`, `&&`, `||`, `switch`, loops or functions, and not when they use variables created inside the expression. Otherwise they run in the worker, where a failure keeps the previous value.

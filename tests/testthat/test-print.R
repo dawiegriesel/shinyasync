@@ -39,6 +39,14 @@ test_that("print() reports a capture error instead of raising it", {
   expect_false(any(grepl("^  worker", out)))
 })
 
+test_that("print() lists functions the session cannot resolve", {
+  local_plain_cli()
+  input <- shiny::reactiveValues(n = 5)
+  r <- reactiveAsync(no_such_fn(input$n))
+  expect_silent(out <- capture.output(print(r)))
+  expect_true(any(grepl("^  missing  no_such_fn\\(\\)", out)))
+})
+
 test_that("printing before a reactive is defined does not fix the analysis", {
   local_plain_cli()
   input <- shiny::reactiveValues(n = 5)

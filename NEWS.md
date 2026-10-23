@@ -1,5 +1,12 @@
 # shinyasync (development version)
 
+## New features
+
+* A function the session cannot resolve warns on the first run, naming the
+  function and the fix (attach the package in the session or use
+  `pkg::fn()`), instead of failing on the worker after the task has run.
+  `print()` lists such functions on a `missing` line.
+
 ## Bug fixes
 
 * The message printed when the default pool starts points to the top level of
