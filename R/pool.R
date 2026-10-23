@@ -165,7 +165,7 @@ ensure_pool <- function(compute = NULL) {
     pool_state$announced <- TRUE
     message(
       "shinyasync: starting a pool of ", default_workers(), " local daemons. ",
-      "Call pool_async() in your server function to size it."
+      "Call pool_async() at the top level of `app.R` to size it."
     )
   }
   pool_async()

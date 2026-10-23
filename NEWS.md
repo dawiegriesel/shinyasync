@@ -1,5 +1,10 @@
 # shinyasync (development version)
 
+## Bug fixes
+
+* The message printed when the default pool starts points to the top level of
+  `app.R`, where `pool_async()` belongs, not to the server function.
+
 # shinyasync 0.4.0
 
 ## New features

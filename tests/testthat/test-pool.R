@@ -53,7 +53,7 @@ test_that("the first task starts a default pool held by its session", {
     output$x <- shiny::renderText(r())
   }, {
     # setInputs() flushes, which runs the first task.
-    expect_message(session$setInputs(n = 1), "starting a pool")
+    expect_message(session$setInputs(n = 1), "starting a pool.*top level of `app.R`")
     expect_true(mirai::daemons_set())
     expect_true(pool_state$owned)
     expect_equal(pool_state$refs, 1L)
