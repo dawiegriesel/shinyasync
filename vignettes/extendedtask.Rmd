@@ -102,9 +102,11 @@ ship what they need.
 
 ## Status and the previous value
 
-Both report `"running"`, `"success"` and `"error"`, and both halt an output
-that reads a task that has not run yet. The differences are in the first state
-and in what happens to the previous value.
+Both report `"initial"`, `"running"`, `"success"` and `"error"`, and both halt
+an output that reads a task that has not run yet, so status code moves over
+unchanged. shinyasync adds one status, `"idle"`, after a cancel or a worker-side
+`req()` halt with no value. The difference is in what happens to the previous
+value.
 
 ```{r status-et}
 # ExtendedTask
@@ -113,7 +115,7 @@ output$status <- renderText(marine_task$status())    # "initial" before the firs
 
 ```{r status-sa}
 # shinyasync
-output$status <- renderText(status_async(marine))    # "idle" before the first run
+output$status <- renderText(status_async(marine))    # "initial" before the first run
 ```
 
 `invoke()` clears the stored value, and while the task runs `result()` halts
@@ -329,4 +331,4 @@ likely to meet:
 | Depends on another task | another task and observer | read it in the expression |
 | Side effect | task nobody reads, plus observer | `observeAsync()` |
 | Task source | any promise | mirai |
-| Status values | `initial`, `running`, `success`, `error` | `idle`, `running`, `success`, `error` |
+| Status values | `initial`, `running`, `success`, `error` | the same, plus `idle` after a cancel or a halt with no value |

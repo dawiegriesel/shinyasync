@@ -9,7 +9,12 @@
 #' @param r An object created by [reactiveAsync()], [observeAsync()] or
 #'   [reactiveValAsync()].
 #'
-#' @return One of `"idle"`, `"running"`, `"success"` or `"error"`.
+#' @return One of `"initial"`, `"running"`, `"success"`, `"error"` or `"idle"`.
+#'   The first four are the statuses of a [shiny::ExtendedTask]: `"initial"`
+#'   until the first task is sent to a worker, never again afterwards.
+#'   `"idle"` is a task that has been sent but has no value: it was cancelled
+#'   with [cancel_async()], or it halted on the worker in a `req()` before any
+#'   result.
 #' @export
 status_async <- function(r) {
   task <- get_task(r, "status_async")

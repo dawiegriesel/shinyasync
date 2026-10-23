@@ -97,7 +97,7 @@ r <- reactiveAsync({ fit_model(input$formula, data()) }) |>
   bindEvent(input$go)
 ```
 
-A cancel button calls `cancel_async(r)`. Afterwards the status is `"idle"`
+A cancel button calls `cancel_async(r)`. Afterwards the status is `"idle"`, a status an `ExtendedTask` does not have,
 while `has_value_async(r)` stays `TRUE`, and the previous result remains on
 screen until the next click starts a new task.
 
@@ -235,7 +235,7 @@ Runs `expr` in a worker with the same dependency capture as `reactiveAsync()` an
 
 ### `status_async(r)`
 
-Reactive status of an async reactive: `"idle"`, `"running"`, `"success"` or `"error"`. Use it for spinners and disabled buttons. Reading the status of a `reactiveAsync()` that has not run yet starts it, the same way reading its value does.
+Reactive status of an async reactive: `"initial"`, `"running"`, `"success"` or `"error"`, as for an `ExtendedTask`, plus `"idle"` for a task that was cancelled or halted on the worker before it had a value. Use it for spinners and disabled buttons. Reading the status of a `reactiveAsync()` that has not run yet starts it, the same way reading its value does.
 
 ### `has_value_async(r)`
 
@@ -270,7 +270,7 @@ simulate <- function(n, sd) density(rnorm(n, sd = sd))
 r <- reactiveAsync(simulate(input$n, sd = sd))
 print(r)
 #> ── <reactiveAsync> reactiveAsync(simulate(input$n, sd = sd)) ────────────
-#>   status   idle
+#>   status   initial
 #>   session  .sa_1 input$n
 #>   shipped  sd <numeric>, simulate()
 #>   attached stats

@@ -1,5 +1,12 @@
 # shinyasync (development version)
 
+## Breaking changes
+
+* `status_async()` returns `"initial"` instead of `"idle"` before the first
+  task is sent to a worker, the value `ExtendedTask$status()` returns, so
+  status code moves over unchanged. `"idle"` remains the status after
+  `cancel_async()` or a worker-side `req()` halt with no value.
+
 ## New features
 
 * A function the session cannot resolve warns on the first run, naming the

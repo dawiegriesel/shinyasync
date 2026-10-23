@@ -54,7 +54,7 @@ test_that("a hoisted req() halts the observer and leaves the value alone", {
   }, {
     session$setInputs(n = 0)
     session$flushReact()
-    expect_equal(status_async(v), "idle")
+    expect_equal(status_async(v), "initial")
     expect_equal(shiny::isolate(v()), "initial")
     session$setInputs(n = 3)
     wait_for(function() identical(peek(v), 3), session)

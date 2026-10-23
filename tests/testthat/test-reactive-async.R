@@ -111,7 +111,7 @@ test_that("req() halts quietly on the session side", {
     output$x <- shiny::renderText(r())
   }, {
     session$setInputs(n = NULL)
-    expect_equal(status_async(r), "idle")
+    expect_equal(status_async(r), "initial")
     session$setInputs(n = 1)
     wait_for(function() identical(peek(r), 2), session)
   })
@@ -160,7 +160,7 @@ test_that("tasks are not started until the reactive is read", {
     r <- reactiveAsync(input$n)
   }, {
     session$setInputs(n = 1)
-    expect_equal(status_async(r), "idle")
+    expect_equal(status_async(r), "initial")
   })
 })
 

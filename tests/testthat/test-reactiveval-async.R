@@ -4,7 +4,7 @@ test_that("reactiveValAsync accepts plain values, mirai and promises", {
     v <- reactiveValAsync(0)
   }, {
     expect_equal(shiny::isolate(v()), 0)
-    expect_equal(status_async(v), "idle")
+    expect_equal(status_async(v), "initial")
 
     v(1)
     expect_equal(shiny::isolate(v()), 1)

@@ -9,6 +9,9 @@
 #' @param value The initial value.
 #' @param label A label for debugging.
 #'
+#' @details [status_async()] reports `"initial"` until the first task is set,
+#'   also when `value` was given, since no task has run.
+#'
 #' @return A function of class `"reactiveValAsync"`. Call it with no arguments
 #'   to read the value, or with one argument to set it. Errors from a failed
 #'   task are re-thrown on read.

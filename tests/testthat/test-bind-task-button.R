@@ -80,7 +80,7 @@ test_that("binding a button does not start an unread reactiveAsync()", {
   }, {
     session$setInputs(n = 1)
     expect_equal(log$states, character())
-    expect_equal(attr(r, "shinyasync")$current_status(), "idle")
+    expect_equal(attr(r, "shinyasync")$current_status(), "initial")
   })
 })
 

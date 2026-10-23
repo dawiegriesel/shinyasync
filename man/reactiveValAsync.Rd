@@ -23,6 +23,10 @@ one is running supersedes the old one: a running \code{mirai} is cancelled and a
 promise's result is ignored. Use \code{\link[=mirai_async]{mirai_async()}} to start the task so that
 helper functions and reactive reads are captured as in \code{\link[=reactiveAsync]{reactiveAsync()}}.
 }
+\details{
+\code{\link[=status_async]{status_async()}} reports \code{"initial"} until the first task is set,
+also when \code{value} was given, since no task has run.
+}
 \examples{
 if (interactive()) {
   library(shiny)

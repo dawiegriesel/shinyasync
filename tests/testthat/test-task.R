@@ -63,3 +63,41 @@ test_that("a task that completes before its promise is registered still settles"
     expect_equal(status_async(r), "success")
   })
 })
+
+test_that("status is initial until a task is dispatched and idle after a cancel or halt", {
+  local_pool()
+  shiny::testServer(function(input, output, session) {
+    r <- reactiveAsync({
+      req(input$n > 0)
+      Sys.sleep(input$n)
+      input$n
+    })
+    output$x <- shiny::renderText(r())
+  }, {
+    # A session-side req() halt before any run keeps the initial status.
+    session$setInputs(n = 0)
+    expect_equal(status_async(r), "initial")
+    expect_equal(peek(r), "<halted>")
+
+    # Cancelling a running task without a value: idle, never initial again.
+    session$setInputs(n = 5)
+    expect_equal(status_async(r), "running")
+    cancel_async(r)
+    expect_equal(status_async(r), "idle")
+    session$setInputs(n = 0)
+    expect_equal(status_async(r), "idle")
+  })
+})
+
+test_that("a worker-side halt before any value gives idle", {
+  local_pool()
+  shiny::testServer(function(input, output, session) {
+    r <- reactiveAsync({ n <- input$n; if (n < 0) req(FALSE); n })
+    output$x <- shiny::renderText(r())
+  }, {
+    session$setInputs(n = -1)
+    wait_for(function() status_async(r) != "running", session)
+    expect_equal(status_async(r), "idle")
+    expect_equal(peek(r), "<halted>")
+  })
+})

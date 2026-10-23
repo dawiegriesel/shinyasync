@@ -11,7 +11,12 @@ status_async(r)
 \code{\link[=reactiveValAsync]{reactiveValAsync()}}.}
 }
 \value{
-One of \code{"idle"}, \code{"running"}, \code{"success"} or \code{"error"}.
+One of \code{"initial"}, \code{"running"}, \code{"success"}, \code{"error"} or \code{"idle"}.
+The first four are the statuses of a \link[shiny:ExtendedTask]{shiny::ExtendedTask}: \code{"initial"}
+until the first task is sent to a worker, never again afterwards.
+\code{"idle"} is a task that has been sent but has no value: it was cancelled
+with \code{\link[=cancel_async]{cancel_async()}}, or it halted on the worker in a \code{req()} before any
+result.
 }
 \description{
 A reactive read of the task status, for spinners and disabled buttons.

@@ -15,12 +15,12 @@ test_that("print() lists hoisted calls, shipped objects and the worker expressio
 
   out <- capture.output(print(r))
   expect_match(out[1], "<reactiveAsync> reactiveAsync\\(")
-  expect_match(out[2], "^  status   idle$")
+  expect_match(out[2], "^  status   initial$")
   expect_true(any(grepl(".sa_1 shiny::req(input$n), .sa_2 data()", out, fixed = TRUE)))
   expect_true(any(grepl("helper(), sd <numeric>, extra <character> (globals)", out, fixed = TRUE)))
   expect_true(any(grepl("helper(.sa_2) + sd + stats::rnorm(1)", out, fixed = TRUE)))
   # Printing is not a read: the task has not started.
-  expect_equal(attr(r, "shinyasync")$state, "idle")
+  expect_equal(attr(r, "shinyasync")$state, "initial")
 })
 
 test_that("print() reports a capture error instead of raising it", {
@@ -71,7 +71,7 @@ test_that("observeAsync and reactiveValAsync print their status", {
   out <- capture.output(print(v))
   expect_length(out, 2L)
   expect_match(out[1], "<reactiveValAsync> v ")
-  expect_match(out[2], "^  status   idle$")
+  expect_match(out[2], "^  status   initial$")
 })
 
 test_that("in devmode a task prints itself once, on its first run", {

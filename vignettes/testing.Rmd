@@ -123,9 +123,9 @@ wait above uses the output changing as its condition for that reason.
 
 ## Status, buttons and cancellation
 
-Statuses follow the task. A `bindEvent()` task is `"idle"` until its event,
+Statuses follow the task. A `bindEvent()` task is `"initial"` until its event,
 `"running"` while the worker has it, and `"success"` or `"error"` after.
-`cancel_async()` returns it to `"idle"` while keeping the last value.
+`cancel_async()` sets it to `"idle"` while keeping the last value.
 
 ```{r button}
 server <- function(input, output, session) {
@@ -140,7 +140,7 @@ test_that("a button task runs on click and stops on cancel", {
   local_pool()
   testServer(server, {
     session$setInputs(n = 100)
-    expect_equal(status_async(sim), "idle")
+    expect_equal(status_async(sim), "initial")
 
     session$setInputs(go = 1)
     expect_equal(status_async(sim), "running")

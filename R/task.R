@@ -12,13 +12,15 @@ new_async_task <- function(mode = c("latest", "queue"), label = "shinyasync",
 
   st$label <- label
   st$kind <- "reactiveValAsync"
-  st$status <- shiny::reactiveVal("idle", label = paste0(label, "$status"))
+  # "initial" until the first task is dispatched, as for ExtendedTask; after
+  # that a task with no value is "idle" (cancelled, or halted on the worker).
+  st$status <- shiny::reactiveVal("initial", label = paste0(label, "$status"))
   # Wrapped in a list so that NULL results are distinguishable from "no value".
   st$value <- shiny::reactiveVal(NULL, label = paste0(label, "$value"))
   st$error <- shiny::reactiveVal(NULL, label = paste0(label, "$error"))
   # The reactive reads the current value was computed from; see is_stale().
   st$inputs <- shiny::reactiveVal(NULL, label = paste0(label, "$inputs"))
-  st$state <- "idle"
+  st$state <- "initial"
   st$gen <- 0L
   st$current <- NULL
   st$queue <- list()
