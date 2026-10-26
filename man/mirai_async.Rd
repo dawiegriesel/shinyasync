@@ -52,6 +52,7 @@ time it runs in a session, as \code{\link[=reactiveAsync]{reactiveAsync()}} does
 \examples{
 if (interactive()) {
   library(shiny)
+  library(shinyasync)
   server <- function(input, output, session) {
     # One forecast per spot, fetched in parallel on each refresh.
     forecasts <- lapply(spots, function(spot) reactiveValAsync())

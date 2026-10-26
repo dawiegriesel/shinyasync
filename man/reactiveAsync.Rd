@@ -102,6 +102,7 @@ do that in an \code{\link[shiny:observe]{shiny::observe()}} that reads the resul
 \examples{
 if (interactive()) {
   library(shiny)
+  library(shinyasync)
   server <- function(input, output, session) {
     r <- reactiveAsync({
       Sys.sleep(1)

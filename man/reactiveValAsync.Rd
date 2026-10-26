@@ -30,6 +30,7 @@ also when \code{value} was given, since no task has run.
 \examples{
 if (interactive()) {
   library(shiny)
+  library(shinyasync)
   server <- function(input, output, session) {
     # Set from two places, so a reactiveVal rather than a reactive.
     report <- reactiveValAsync()

@@ -24,6 +24,7 @@
 #' @examples
 #' if (interactive()) {
 #'   library(shiny)
+#'   library(shinyasync)
 #'   library(bslib)
 #'   ui <- page_fluid(
 #'     selectInput("spot", "Spot", c("Muizenberg", "Kommetjie")),

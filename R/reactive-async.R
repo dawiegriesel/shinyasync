@@ -78,6 +78,7 @@
 #' @examples
 #' if (interactive()) {
 #'   library(shiny)
+#'   library(shinyasync)
 #'   server <- function(input, output, session) {
 #'     r <- reactiveAsync({
 #'       Sys.sleep(1)

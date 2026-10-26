@@ -36,6 +36,7 @@ did not fail.
 \examples{
 if (interactive()) {
   library(shiny)
+  library(shinyasync)
   server <- function(input, output, session) {
     forecast <- reactiveAsync(fetch_forecast(input$spot))
     output$forecast <- renderTable(forecast())

@@ -48,6 +48,7 @@ status_async <- function(r) {
 #' @examples
 #' if (interactive()) {
 #'   library(shiny)
+#'   library(shinyasync)
 #'   server <- function(input, output, session) {
 #'     forecast <- reactiveAsync(fetch_forecast(input$spot))
 #'     output$forecast <- renderTable(forecast())
