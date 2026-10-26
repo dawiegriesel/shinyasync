@@ -36,17 +36,20 @@
 
 \item{...}{Ignored.}
 
-\item{session}{The Shiny session.}
+\item{session}{The Shiny session, by default the current reactive domain.
+Binding outside a session is an error at the call.}
 }
 \value{
-\code{target}, invisibly, so the call can be piped like \code{bindEvent()}.
+\code{target}, as \code{\link[bslib:bind_task_button]{bslib::bind_task_button()}} returns an \code{ExtendedTask}.
 }
 \description{
 Methods for \code{\link[bslib:bind_task_button]{bslib::bind_task_button()}} so that a \code{\link[bslib:input_task_button]{bslib::input_task_button()}}
 shows its busy state while the task of a \code{\link[=reactiveAsync]{reactiveAsync()}}, \code{\link[=observeAsync]{observeAsync()}}
-or \code{\link[=reactiveValAsync]{reactiveValAsync()}} is \code{"running"} and returns to ready when it settles
-or is cancelled, as it does for an \code{ExtendedTask}. Binding reads the task
-status without starting a \code{\link[=reactiveAsync]{reactiveAsync()}} that nothing has read yet.
+or \code{\link[=reactiveValAsync]{reactiveValAsync()}} is \code{"running"} and returns to ready when it settles,
+as it does for an \code{ExtendedTask}. It also returns to ready when the task is
+cancelled with \code{\link[=cancel_async]{cancel_async()}}. Binding does not start the task: a
+\code{\link[=reactiveAsync]{reactiveAsync()}} still waits for its first read, as described in its
+Details.
 }
 \examples{
 if (interactive()) {
@@ -55,13 +58,17 @@ if (interactive()) {
   ui <- page_fluid(
     selectInput("spot", "Spot", c("Muizenberg", "Kommetjie")),
     input_task_button("go", "Simulate"),
+    actionButton("cancel", "Cancel"),
     plotOutput("band")
   )
   server <- function(input, output, session) {
-    sim <- reactiveAsync(simulate_band(input$spot)) |>
+    marine <- reactiveAsync(fetch_marine(input$spot))
+    wind <- reactiveAsync(fetch_wind(input$spot))
+    sim <- reactiveAsync(simulate_band(input$spot, marine(), wind())) |>
       bindEvent(input$go) |>
       bind_task_button("go")
-    output$band <- renderPlot(plot(sim()))
+    observe(cancel_async(sim)) |> bindEvent(input$cancel)
+    output$band <- renderPlot(plot_band(sim()))
   }
   shinyApp(ui, server)
 }

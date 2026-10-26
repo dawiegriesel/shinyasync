@@ -21,6 +21,8 @@
 
 ## Bug fixes
 
+* `bslib::bind_task_button()` returns the async object visibly, as it
+  returns an `ExtendedTask` and as `bindEvent()` returns it.
 * The message printed when the default pool starts points to the top level of
   `app.R`, where `pool_async()` belongs, not to the server function.
 
