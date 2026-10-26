@@ -353,3 +353,95 @@ test_that("session calls through a module object, as box::use(shiny) binds them,
   expect_equal(a$hoisted, list(quote(input$n)))
   expect_true("other" %in% a$free)
 })
+
+test_that("a function with a NULL body keeps it when the expression has srcrefs", {
+  # Parsed with srcrefs, as a sourced file, a box module or the console has
+  # it, `function(e) NULL` carries its srcref as a fourth element.
+  expr <- parse(text = "tryCatch(stop('boom'), error = function(e) NULL)", keep.source = TRUE)[[1]]
+  a <- analyze_expr(expr, environment())
+  handler <- a$expr[[3]]
+  expect_identical(handler[[1]], quote(`function`))
+  expect_null(handler[[3]])
+  expect_null(eval(a$expr, globalenv()))
+})
+
+# The shapes box gives a module: its own environment, named "namespace:<mod>"
+# and marked by `.__module__.`, whose parent holds its imports; and the
+# `box$mod` environment a top-level box::use() attaches.
+box_namespace <- function(name, imports = list()) {
+  imp <- list2env(imports, parent = baseenv())
+  attr(imp, "name") <- paste0("imports:", name)
+  ns <- new.env(parent = imp)
+  attr(ns, "name") <- paste0("namespace:", name)
+  assign(".__module__.", new.env(), envir = ns)
+  ns
+}
+in_env <- function(f, env) {
+  environment(f) <- env
+  f
+}
+
+test_that("a function defined in a box module is shipped", {
+  view <- box_namespace("view")
+  view$local_helper <- in_env(function(x) x + offset, view)
+  view$offset <- 1
+  server_env <- new.env(parent = view)
+
+  deps <- collect_globals(quote(local_helper(41)), server_env)
+  expect_named(deps$values, "local_helper")
+  expect_length(deps$missing, 0)
+  f <- deps$values$local_helper
+  expect_identical(parent.env(environment(f)), globalenv())
+  expect_equal(f(41), 42)
+})
+
+test_that("an imported box function is shipped with the helpers its module defines", {
+  helpers <- box_namespace("helpers")
+  helpers$helper <- in_env(function(x) x * 2, helpers)
+  helpers$f <- in_env(function(x) helper(x), helpers)
+  view <- box_namespace("view", imports = list(f = helpers$f))
+  server_env <- new.env(parent = view)
+
+  deps <- collect_globals(quote(f(21)), server_env)
+  f <- deps$values$f
+  expect_setequal(ls(environment(f)), c("f", "helper"))
+  expect_equal(f(21), 42)
+})
+
+test_that("a function attached by a top-level box::use() is shipped", {
+  helpers <- box_namespace("helpers")
+  helpers$f <- in_env(function(x) x * 2, helpers)
+  attached <- new.env(parent = globalenv())
+  class(attached) <- "box$mod"
+  attr(attached, "name") <- "mod:helpers"
+  attached$f <- helpers$f
+  caller <- new.env(parent = attached)
+
+  deps <- collect_globals(quote(f(21)), caller)
+  expect_named(deps$values, "f")
+  expect_equal(deps$values$f(21), 42)
+})
+
+test_that("box module functions run on the worker", {
+  local_pool(1)
+  view <- box_namespace("view", imports = list(reactiveAsync = reactiveAsync))
+  view$local_helper <- in_env(function(x) x + 1, view)
+  server <- in_env(function(input, output, session) {
+    r <- reactiveAsync(local_helper(input$n))
+    output$x <- shiny::renderText(r())
+  }, new.env(parent = view))
+
+  shiny::testServer(server, {
+    session$setInputs(n = 41)
+    wait_for(function() status_async(r) == "success", session)
+    expect_equal(shiny::isolate(r()), 42)
+  })
+})
+
+test_that("an S4 generic a box module imports is shipped as it is", {
+  # Rebound to a clone, a generic loses the method tables in its own
+  # environment and dispatch fails ("unable to find an inherited method").
+  view <- box_namespace("view", imports = list(show_it = show))
+  deps <- collect_globals(quote(show_it(1)), new.env(parent = view))
+  expect_identical(deps$values$show_it, show)
+})

@@ -1,5 +1,21 @@
 # shinyasync (development version)
 
+## Bug fixes
+
+* Functions defined in a box module are shipped to the worker. A box
+  module's own environment is not an R namespace, so a helper defined at the
+  top of a view module, or one an imported box function calls from its own
+  module, was found in the session but neither shipped nor reported as
+  missing, and the task failed with "could not find function". Functions a
+  top-level `box::use()` attaches are shipped too (#29).
+* An S4 generic, such as `DBI::dbConnect()` imported with `box::use()`, is
+  shipped as it is instead of being rebound to a copy of its environment,
+  which lost its method tables and failed dispatch on the worker.
+* `function(e) NULL` keeps its `NULL` body when the expression carries source
+  references, as code from a sourced file, a box module or the console does.
+  The rewrite deleted the body, so the function returned its srcref instead
+  (#30).
+
 # shinyasync 0.5.0
 
 ## Breaking changes
