@@ -219,7 +219,9 @@ analyze_expr <- function(expr, env) {
 
     if (identical(head, quote(`function`)) && n >= 3L) {
       params <- names(x[[2]])
-      x[[3]] <- walk(x[[3]], c(locals, params), TRUE, isolated)
+      # Only a call can be rewritten, and assigning NULL into a call deletes
+      # the element: `function(e) NULL` would take its srcref as its body.
+      if (is.call(x[[3]])) x[[3]] <- walk(x[[3]], c(locals, params), TRUE, isolated)
       return(x)
     }
 
@@ -504,7 +506,7 @@ collect_globals <- function(names, env, soft = character(), cache = NULL,
       return(NULL)
     }
     if (!identical(where, globalenv()) && !isNamespace(where) &&
-        !startsWith(env_name, "imports:") && env_name != "") {
+        !startsWith(env_name, "imports:") && env_name != "" && !is_box_env(where)) {
       return(NULL)  # Autoloads, tools:rstudio and similar
     }
 
@@ -631,9 +633,22 @@ lookup <- function(name, env, mode = "any") {
   list(found = FALSE)
 }
 
+# A box module's own environment ("namespace:<mod>") or the one a top-level
+# box::use() attaches ("mod:<path>"). Neither is an R namespace a worker could
+# find again by name, so their objects are shipped as the global environment's
+# are. The marker test is box's own is_namespace().
+is_box_env <- function(env) {
+  inherits(env, "box$mod") ||
+    exists(".__module__.", envir = env, mode = "environment", inherits = FALSE)
+}
+
+# Functions shipped as they are rather than rebound to a clone: those of a
+# package, and S4 generics, whose environment holds the method tables dispatch
+# needs (box binds DBI::dbConnect() in a module's imports like any function).
 in_namespace <- function(f) {
   e <- environment(f)
-  is.null(e) || isNamespace(e) || identical(e, baseenv())
+  is.null(e) || isNamespace(e) || identical(e, baseenv()) ||
+    (isS4(f) && exists(".Generic", envir = e, inherits = FALSE))
 }
 
 is_reactive_like <- function(x) {
