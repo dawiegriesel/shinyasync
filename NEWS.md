@@ -1,18 +1,18 @@
-# shinyasync (development version)
+# shinyasync 0.5.0
 
 ## Breaking changes
 
 * `status_async()` returns `"initial"` instead of `"idle"` before the first
   task is sent to a worker, the value `ExtendedTask$status()` returns, so
   status code moves over unchanged. `"idle"` remains the status after
-  `cancel_async()` or a worker-side `req()` halt with no value.
+  `cancel_async()` or a worker-side `req()` halt with no value (@hypebright).
 
 ## New features
 
 * A function the session cannot resolve warns on the first run, naming the
   function and the fix (attach the package in the session or use
   `pkg::fn()`), instead of failing on the worker after the task has run.
-  `print()` lists such functions on a `missing` line.
+  `print()` lists such functions on a `missing` line (@hypebright).
 * `req()`, `validate()`, `invalidateLater()`, `isolate()`, `status_async()`
   and `has_value_async()` are recognised when called through a module
   object, as `shiny$req()` or `shinyasync$status_async()`, which is how
@@ -24,7 +24,8 @@
 * `bslib::bind_task_button()` returns the async object visibly, as it
   returns an `ExtendedTask` and as `bindEvent()` returns it.
 * The message printed when the default pool starts points to the top level of
-  `app.R`, where `pool_async()` belongs, not to the server function.
+  `app.R`, where `pool_async()` belongs, not to the server function
+  (@hypebright).
 
 # shinyasync 0.4.0
 
