@@ -20,6 +20,24 @@
 #' @return An observer handle of class `"observeAsync"`: a list with methods
 #'   `status()`, `cancel()`, `destroy()`, `suspend()` and `resume()`.
 #' @export
+#' @seealso [reactiveAsync()] for a result that outputs read, and [status_async()].
+#' @examplesIf interactive()
+#' library(shiny)
+#' library(shinyasync)
+#' log_file <- tempfile(fileext = ".log")
+#' ui <- fluidPage(
+#'   textInput("note", "Note"),
+#'   actionButton("save", "Save"),
+#'   textOutput("status")
+#' )
+#' server <- function(input, output, session) {
+#'   # The write runs on a worker, so a slow disk never blocks the session.
+#'   saver <- observeAsync({
+#'     write(paste(format(Sys.time()), input$note), log_file, append = TRUE)
+#'   }) |> bindEvent(input$save)
+#'   output$status <- renderText(paste("Last save:", status_async(saver)))
+#' }
+#' shinyApp(ui, server)
 observeAsync <- function(expr, ..., globals = NULL, label = NULL,
                          env = parent.frame(), quoted = FALSE) {
   force(env)

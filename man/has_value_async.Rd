@@ -34,20 +34,24 @@ an \code{\link[=observeAsync]{observeAsync()}} it is \code{TRUE} once a run has 
 did not fail.
 }
 \examples{
-if (interactive()) {
-  library(shiny)
-  library(shinyasync)
-  server <- function(input, output, session) {
-    forecast <- reactiveAsync(fetch_forecast(input$spot))
-    output$forecast <- renderTable(forecast())
-    output$note <- renderUI({
-      running <- status_async(forecast) == "running"
-      if (running && !has_value_async(forecast)) {
-        icon("spinner", class = "fa-spin")
-      } else if (running) {
-        span(class = "text-muted", "Showing the previous forecast while the new one loads")
-      }
-    })
-  }
+\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
+library(shiny)
+library(shinyasync)
+server <- function(input, output, session) {
+  # fetch_forecast() is defined in the app's R/ directory.
+  forecast <- reactiveAsync(fetch_forecast(input$spot))
+  output$forecast <- renderTable(forecast())
+  output$note <- renderUI({
+    running <- status_async(forecast) == "running"
+    if (running && !has_value_async(forecast)) {
+      icon("spinner", class = "fa-spin")
+    } else if (running) {
+      span(class = "text-muted", "Showing the previous forecast while the new one loads")
+    }
+  })
 }
+\dontshow{\}) # examplesIf}
+}
+\seealso{
+\code{\link[=status_async]{status_async()}} and \code{\link[=cancel_async]{cancel_async()}}.
 }

@@ -16,19 +16,20 @@
 #'   to read the value, or with one argument to set it. Errors from a failed
 #'   task are re-thrown on read.
 #' @export
-#' @examples
-#' if (interactive()) {
-#'   library(shiny)
-#'   library(shinyasync)
-#'   server <- function(input, output, session) {
-#'     # Set from two places, so a reactiveVal rather than a reactive.
-#'     report <- reactiveValAsync()
-#'     observe({
-#'       report(mirai_async(build_report(input$region, input$month)))
-#'     }) |> bindEvent(input$generate)
-#'     observe(report(NULL)) |> bindEvent(input$clear)
-#'     output$report <- renderTable(report())
-#'   }
+#' @seealso [mirai_async()] to start a task with dependency capture, and
+#'   [status_async()].
+#' @examplesIf interactive()
+#' library(shiny)
+#' library(shinyasync)
+#' server <- function(input, output, session) {
+#'   # Set from two places, so a reactiveVal rather than a reactive.
+#'   # build_report() is defined in the app's R/ directory.
+#'   report <- reactiveValAsync()
+#'   observe({
+#'     report(mirai_async(build_report(input$region, input$month)))
+#'   }) |> bindEvent(input$generate)
+#'   observe(report(NULL)) |> bindEvent(input$clear)
+#'   output$report <- renderTable(report())
 #' }
 reactiveValAsync <- function(value = NULL, label = NULL) {
   label <- label %||% assign_label(sys.calls(), "reactiveValAsync")

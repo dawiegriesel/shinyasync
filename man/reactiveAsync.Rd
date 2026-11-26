@@ -100,18 +100,34 @@ do that in an \code{\link[shiny:observe]{shiny::observe()}} that reads the resul
 }
 
 \examples{
-if (interactive()) {
-  library(shiny)
-  library(shinyasync)
-  server <- function(input, output, session) {
-    # Bootstrap the slope of mpg on a predictor; the fits run in a worker.
-    slopes <- reactiveAsync({
-      f <- reformulate(input$x, "mpg")
-      replicate(2000, coef(lm(f, mtcars[sample(32, replace = TRUE), ]))[[2]])
-    })
-    output$p <- renderPlot(hist(slopes()))
-  }
-  ui <- fluidPage(selectInput("x", "Predictor", c("wt", "hp")), plotOutput("p"))
-  shinyApp(ui, server)
+# print() shows what runs on the session and what is shipped to the worker,
+# without starting a task. A reactiveValues() stands in for input.
+library(shiny)
+input <- reactiveValues(x = "wt", B = 2000)
+slope <- function(d, x) coef(lm(reformulate(x, "mpg"), d))[[2]]
+slopes <- reactiveAsync(
+  replicate(input$B, slope(mtcars[sample(nrow(mtcars), replace = TRUE), ], input$x))
+)
+print(slopes)
+
+\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
+library(shiny)
+library(shinyasync)
+server <- function(input, output, session) {
+  # Bootstrap the slope of mpg on a predictor; the fits run in a worker.
+  slopes <- reactiveAsync({
+    f <- reformulate(input$x, "mpg")
+    replicate(2000, coef(lm(f, mtcars[sample(32, replace = TRUE), ]))[[2]])
+  })
+  output$p <- renderPlot(hist(slopes()))
 }
+ui <- fluidPage(selectInput("x", "Predictor", c("wt", "hp")), plotOutput("p"))
+shinyApp(ui, server)
+\dontshow{\}) # examplesIf}
+}
+\seealso{
+\code{\link[=status_async]{status_async()}}, \code{\link[=has_value_async]{has_value_async()}} and \code{\link[=cancel_async]{cancel_async()}} to
+read and control the task. \code{vignette("capture")} explains what an
+expression ships and \code{vignette("extendedtask")} compares it with
+\link[shiny:ExtendedTask]{shiny::ExtendedTask}.
 }

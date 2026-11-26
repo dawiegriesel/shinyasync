@@ -28,17 +28,22 @@ helper functions and reactive reads are captured as in \code{\link[=reactiveAsyn
 also when \code{value} was given, since no task has run.
 }
 \examples{
-if (interactive()) {
-  library(shiny)
-  library(shinyasync)
-  server <- function(input, output, session) {
-    # Set from two places, so a reactiveVal rather than a reactive.
-    report <- reactiveValAsync()
-    observe({
-      report(mirai_async(build_report(input$region, input$month)))
-    }) |> bindEvent(input$generate)
-    observe(report(NULL)) |> bindEvent(input$clear)
-    output$report <- renderTable(report())
-  }
+\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
+library(shiny)
+library(shinyasync)
+server <- function(input, output, session) {
+  # Set from two places, so a reactiveVal rather than a reactive.
+  # build_report() is defined in the app's R/ directory.
+  report <- reactiveValAsync()
+  observe({
+    report(mirai_async(build_report(input$region, input$month)))
+  }) |> bindEvent(input$generate)
+  observe(report(NULL)) |> bindEvent(input$clear)
+  output$report <- renderTable(report())
 }
+\dontshow{\}) # examplesIf}
+}
+\seealso{
+\code{\link[=mirai_async]{mirai_async()}} to start a task with dependency capture, and
+\code{\link[=status_async]{status_async()}}.
 }

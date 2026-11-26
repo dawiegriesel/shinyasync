@@ -16,6 +16,28 @@
 #'   with [cancel_async()], or it halted on the worker in a `req()` before any
 #'   result.
 #' @export
+#' @seealso [has_value_async()] to tell a first run from a refresh,
+#'   [cancel_async()] to stop the task, and `vignette("testing")` to test
+#'   status changes with [shiny::testServer()].
+#' @examplesIf interactive()
+#' library(shiny)
+#' library(shinyasync)
+#' ui <- fluidPage(
+#'   numericInput("n", "Seconds of work", 2, min = 1, max = 10),
+#'   actionButton("go", "Run"),
+#'   textOutput("status"),
+#'   textOutput("result")
+#' )
+#' server <- function(input, output, session) {
+#'   result <- reactiveAsync({
+#'     Sys.sleep(input$n)
+#'     paste("Slept for", input$n, "seconds")
+#'   }) |> bindEvent(input$go)
+#'   # "initial" before the first click, then "running" and "success".
+#'   output$status <- renderText(paste("Status:", status_async(result)))
+#'   output$result <- renderText(result())
+#' }
+#' shinyApp(ui, server)
 status_async <- function(r) {
   task <- get_task(r, "status_async")
   task$start()
@@ -45,22 +67,22 @@ status_async <- function(r) {
 #' @inheritParams status_async
 #' @return `TRUE` or `FALSE`.
 #' @export
-#' @examples
-#' if (interactive()) {
-#'   library(shiny)
-#'   library(shinyasync)
-#'   server <- function(input, output, session) {
-#'     forecast <- reactiveAsync(fetch_forecast(input$spot))
-#'     output$forecast <- renderTable(forecast())
-#'     output$note <- renderUI({
-#'       running <- status_async(forecast) == "running"
-#'       if (running && !has_value_async(forecast)) {
-#'         icon("spinner", class = "fa-spin")
-#'       } else if (running) {
-#'         span(class = "text-muted", "Showing the previous forecast while the new one loads")
-#'       }
-#'     })
-#'   }
+#' @seealso [status_async()] and [cancel_async()].
+#' @examplesIf interactive()
+#' library(shiny)
+#' library(shinyasync)
+#' server <- function(input, output, session) {
+#'   # fetch_forecast() is defined in the app's R/ directory.
+#'   forecast <- reactiveAsync(fetch_forecast(input$spot))
+#'   output$forecast <- renderTable(forecast())
+#'   output$note <- renderUI({
+#'     running <- status_async(forecast) == "running"
+#'     if (running && !has_value_async(forecast)) {
+#'       icon("spinner", class = "fa-spin")
+#'     } else if (running) {
+#'       span(class = "text-muted", "Showing the previous forecast while the new one loads")
+#'     }
+#'   })
 #' }
 has_value_async <- function(r) {
   task <- get_task(r, "has_value_async")
@@ -83,6 +105,28 @@ has_value_async <- function(r) {
 #' @inheritParams status_async
 #' @return `NULL`, invisibly.
 #' @export
+#' @seealso [status_async()], which is `"idle"` after a cancel, and
+#'   [has_value_async()], which stays `TRUE`.
+#' @examplesIf interactive()
+#' library(shiny)
+#' library(shinyasync)
+#' ui <- fluidPage(
+#'   actionButton("go", "Simulate"),
+#'   actionButton("cancel", "Cancel"),
+#'   textOutput("status"),
+#'   verbatimTextOutput("summary")
+#' )
+#' server <- function(input, output, session) {
+#'   sims <- reactiveAsync({
+#'     Sys.sleep(5)  # stands in for a slow simulation
+#'     rnorm(1e5)
+#'   }) |> bindEvent(input$go)
+#'   observe(cancel_async(sims)) |> bindEvent(input$cancel)
+#'   # A cancel keeps the previous summary on screen.
+#'   output$status <- renderText(status_async(sims))
+#'   output$summary <- renderPrint(summary(sims()))
+#' }
+#' shinyApp(ui, server)
 cancel_async <- function(r) {
   get_task(r, "cancel_async")$cancel()
 }
