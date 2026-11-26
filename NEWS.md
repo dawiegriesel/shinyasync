@@ -15,6 +15,9 @@
   references, as code from a sourced file, a box module or the console does.
   The rewrite deleted the body, so the function returned its srcref instead
   (#30).
+* `mirai (>= 2.5.1)` is required. `pool_async(everywhere = )` passes `.min`
+  to `mirai::everywhere()`, which mirai 2.5.0 does not have, so every
+  preload failed with an older mirai.
 
 # shinyasync 0.5.0
 
