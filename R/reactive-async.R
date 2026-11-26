@@ -80,13 +80,14 @@
 #'   library(shiny)
 #'   library(shinyasync)
 #'   server <- function(input, output, session) {
-#'     r <- reactiveAsync({
-#'       Sys.sleep(1)
-#'       rnorm(input$n)
+#'     # Bootstrap the slope of mpg on a predictor; the fits run in a worker.
+#'     slopes <- reactiveAsync({
+#'       f <- reformulate(input$x, "mpg")
+#'       replicate(2000, coef(lm(f, mtcars[sample(32, replace = TRUE), ]))[[2]])
 #'     })
-#'     output$p <- renderPlot(hist(r()))
+#'     output$p <- renderPlot(hist(slopes()))
 #'   }
-#'   ui <- fluidPage(sliderInput("n", "n", 10, 1000, 100), plotOutput("p"))
+#'   ui <- fluidPage(selectInput("x", "Predictor", c("wt", "hp")), plotOutput("p"))
 #'   shinyApp(ui, server)
 #' }
 reactiveAsync <- function(expr, mode = c("latest", "queue"), globals = NULL,
