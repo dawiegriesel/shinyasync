@@ -8,7 +8,14 @@ vignette: >
 ---
 
 ```{r, include = FALSE}
-knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+# The chunks start daemons and run tests against them, which depends on
+# timing a loaded CRAN machine cannot promise; evaluate them only where
+# NOT_CRAN is "true" (local builds, CI and the pkgdown site).
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  eval = identical(Sys.getenv("NOT_CRAN"), "true")
+)
 ```
 
 `shiny::testServer()` works with async reactives as it does with plain ones,
