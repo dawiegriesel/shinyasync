@@ -11,7 +11,7 @@ permissions: read-all
 jobs:
   R-CMD-check:
     runs-on: ${{ matrix.config.os }}
-    name: ${{ matrix.config.os }} (${{ matrix.config.r }})
+    name: ${{ matrix.config.os }} (${{ matrix.config.r }})${{ matrix.config.minimum && ' minimum versions' || '' }}${{ matrix.config.cran && ' as CRAN' || '' }}
     strategy:
       fail-fast: false
       matrix:
@@ -20,10 +20,18 @@ jobs:
           - {os: windows-latest, r: 'release'}
           - {os: ubuntu-latest,  r: 'release'}
           - {os: ubuntu-latest,  r: 'oldrel-1'}
+          # The minimum versions DESCRIPTION declares, so a floor that is too
+          # low fails here instead of on a user's machine.
+          - {os: ubuntu-latest,  r: '4.1', minimum: true}
+          # As CRAN runs it: NOT_CRAN is not "true", so the daemon tests are skipped
+          # and vignette("testing") is not evaluated.
+          - {os: ubuntu-latest,  r: 'release', cran: true}
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
       R_KEEP_PKG_SOURCE: yes
       RENV_CONFIG_AUTOLOADER_ENABLED: false
+      # The daemon tests and vignette("testing") run only when this is "true".
+      NOT_CRAN: ${{ matrix.config.cran && 'false' || 'true' }}
     steps:
       - uses: actions/checkout@v7
       - uses: r-lib/actions/setup-pandoc@v2
@@ -33,9 +41,11 @@ jobs:
           use-public-rspm: true
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
-          extra-packages: any::rcmdcheck
+          extra-packages: >-
+            any::rcmdcheck${{ matrix.config.minimum && ', mirai@2.5.0, shiny@1.8.1, bslib@0.7.0' || '' }}
           needs: check
       - uses: r-lib/actions/check-r-package@v2
         with:
           upload-snapshots: true
           build_args: 'c("--no-manual", "--compact-vignettes=gs+qpdf")'
+          args: ${{ matrix.config.cran && 'c("--no-manual", "--as-cran")' || 'c("--no-manual")' }}
