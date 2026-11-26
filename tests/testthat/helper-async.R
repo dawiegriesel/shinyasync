@@ -1,4 +1,8 @@
+# Tests that start daemons depend on wall-clock windows (a task must still be
+# running when the test acts), which a loaded CRAN machine cannot promise.
+# They run everywhere NOT_CRAN is "true": locally under testthat, and on CI.
 local_pool <- function(n = 2, env = parent.frame()) {
+  testthat::skip_on_cran()
   mirai::daemons(n, dispatcher = TRUE)
   withr::defer(mirai::daemons(0), envir = env)
 }
