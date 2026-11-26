@@ -47,3 +47,26 @@ Errors raised by \code{expr}, in the worker or while resolving its reactive
 dependencies, are reported with \code{\link[=message]{message()}} and leave the observer in
 status \code{"error"} until a dependency changes; the session stays open.
 }
+\examples{
+\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
+library(shiny)
+library(shinyasync)
+log_file <- tempfile(fileext = ".log")
+ui <- fluidPage(
+  textInput("note", "Note"),
+  actionButton("save", "Save"),
+  textOutput("status")
+)
+server <- function(input, output, session) {
+  # The write runs on a worker, so a slow disk never blocks the session.
+  saver <- observeAsync({
+    write(paste(format(Sys.time()), input$note), log_file, append = TRUE)
+  }) |> bindEvent(input$save)
+  output$status <- renderText(paste("Last save:", status_async(saver)))
+}
+shinyApp(ui, server)
+\dontshow{\}) # examplesIf}
+}
+\seealso{
+\code{\link[=reactiveAsync]{reactiveAsync()}} for a result that outputs read, and \code{\link[=status_async]{status_async()}}.
+}

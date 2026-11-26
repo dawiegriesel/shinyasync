@@ -93,6 +93,27 @@ pool_state$preload <- NULL
 #' @return `TRUE` invisibly if this call started or joined a shinyasync pool,
 #'   `FALSE` if daemons were already managed elsewhere.
 #' @export
+#' @seealso `vignette("deployment")` for sizing the pool under a multi-process server,
+#'   monitoring it and preloading the workers.
+#' @examplesIf interactive()
+#' library(shiny)
+#' library(shinyasync)
+#' # At the top level of app.R: two workers, each fitting the model once.
+#' pool_async(workers = 2, everywhere = {
+#'   model <- lm(mpg ~ wt + hp, data = mtcars)
+#' })
+#'
+#' ui <- fluidPage(
+#'   sliderInput("wt", "Weight (1000 lbs)", 1.5, 5.5, 3),
+#'   sliderInput("hp", "Horsepower", 50, 335, 150),
+#'   textOutput("mpg")
+#' )
+#' server <- function(input, output, session) {
+#'   # model is resident on the workers, so it is not shipped with each task.
+#'   mpg <- reactiveAsync(predict(model, data.frame(wt = input$wt, hp = input$hp)))
+#'   output$mpg <- renderText(paste("Predicted mpg:", round(mpg(), 1)))
+#' }
+#' shinyApp(ui, server)
 pool_async <- function(workers = NULL, ..., everywhere = NULL) {
   preload <- new_preload(substitute(everywhere), parent.frame())
   # Daemons may have been torn down externally (e.g. mirai::daemons(0)) since

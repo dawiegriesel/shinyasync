@@ -50,22 +50,23 @@ In \code{\link[shiny:devmode]{shiny::devmode()}} each call site prints what it c
 time it runs in a session, as \code{\link[=reactiveAsync]{reactiveAsync()}} does on its first run.
 }
 \examples{
-if (interactive()) {
-  library(shiny)
-  library(shinyasync)
-  server <- function(input, output, session) {
-    # One forecast per spot, fetched in parallel on each refresh.
-    forecasts <- lapply(spots, function(spot) reactiveValAsync())
-    observe({
-      for (i in seq_along(spots)) {
-        # fetch_marine() and its helpers are shipped to the worker.
-        forecasts[[i]](mirai_async(fetch_marine(spots[[i]], days = input$days)))
-      }
-    }) |> bindEvent(input$refresh)
+\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
+library(shiny)
+library(shinyasync)
+server <- function(input, output, session) {
+  # One forecast per spot, fetched in parallel on each refresh. spots and
+  # fetch_marine() are defined in the app's R/ directory; fetch_marine() and
+  # its helpers are shipped to the worker.
+  forecasts <- lapply(spots, function(spot) reactiveValAsync())
+  observe({
+    for (i in seq_along(spots)) {
+      forecasts[[i]](mirai_async(fetch_marine(spots[[i]], days = input$days)))
+    }
+  }) |> bindEvent(input$refresh)
 
-    output$table <- renderTable(do.call(rbind, lapply(forecasts, function(f) f())))
-  }
+  output$table <- renderTable(do.call(rbind, lapply(forecasts, function(f) f())))
 }
+\dontshow{\}) # examplesIf}
 }
 \seealso{
 \code{\link[=reactiveValAsync]{reactiveValAsync()}}, whose setter accepts the result.

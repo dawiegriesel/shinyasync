@@ -24,3 +24,30 @@ already executing requires a daemon pool with a dispatcher, which
 \code{\link[=pool_async]{pool_async()}} always uses; otherwise the result is discarded when it
 arrives.
 }
+\examples{
+\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
+library(shiny)
+library(shinyasync)
+ui <- fluidPage(
+  actionButton("go", "Simulate"),
+  actionButton("cancel", "Cancel"),
+  textOutput("status"),
+  verbatimTextOutput("summary")
+)
+server <- function(input, output, session) {
+  sims <- reactiveAsync({
+    Sys.sleep(5)  # stands in for a slow simulation
+    rnorm(1e5)
+  }) |> bindEvent(input$go)
+  observe(cancel_async(sims)) |> bindEvent(input$cancel)
+  # A cancel keeps the previous summary on screen.
+  output$status <- renderText(status_async(sims))
+  output$summary <- renderPrint(summary(sims()))
+}
+shinyApp(ui, server)
+\dontshow{\}) # examplesIf}
+}
+\seealso{
+\code{\link[=status_async]{status_async()}}, which is \code{"idle"} after a cancel, and
+\code{\link[=has_value_async]{has_value_async()}}, which stays \code{TRUE}.
+}

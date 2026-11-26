@@ -25,3 +25,30 @@ just as reading its value would, so a UI that waits for \code{"success"} before
 reading the value does not wait forever. A \code{\link[=reactiveAsync]{reactiveAsync()}} that is waiting
 for an upstream async reactive reports \code{"running"} while that upstream runs.
 }
+\examples{
+\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
+library(shiny)
+library(shinyasync)
+ui <- fluidPage(
+  numericInput("n", "Seconds of work", 2, min = 1, max = 10),
+  actionButton("go", "Run"),
+  textOutput("status"),
+  textOutput("result")
+)
+server <- function(input, output, session) {
+  result <- reactiveAsync({
+    Sys.sleep(input$n)
+    paste("Slept for", input$n, "seconds")
+  }) |> bindEvent(input$go)
+  # "initial" before the first click, then "running" and "success".
+  output$status <- renderText(paste("Status:", status_async(result)))
+  output$result <- renderText(result())
+}
+shinyApp(ui, server)
+\dontshow{\}) # examplesIf}
+}
+\seealso{
+\code{\link[=has_value_async]{has_value_async()}} to tell a first run from a refresh,
+\code{\link[=cancel_async]{cancel_async()}} to stop the task, and \code{vignette("testing")} to test
+status changes with \code{\link[shiny:testServer]{shiny::testServer()}}.
+}

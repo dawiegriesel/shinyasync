@@ -52,25 +52,29 @@ cancelled with \code{\link[=cancel_async]{cancel_async()}}. Binding does not sta
 Details.
 }
 \examples{
-if (interactive()) {
-  library(shiny)
-  library(shinyasync)
-  library(bslib)
-  ui <- page_fluid(
-    selectInput("spot", "Spot", c("Muizenberg", "Kommetjie")),
-    input_task_button("go", "Simulate"),
-    actionButton("cancel", "Cancel"),
-    plotOutput("band")
-  )
-  server <- function(input, output, session) {
-    marine <- reactiveAsync(fetch_marine(input$spot))
-    wind <- reactiveAsync(fetch_wind(input$spot))
-    sim <- reactiveAsync(simulate_band(input$spot, marine(), wind())) |>
-      bindEvent(input$go) |>
-      bind_task_button("go")
-    observe(cancel_async(sim)) |> bindEvent(input$cancel)
-    output$band <- renderPlot(plot_band(sim()))
-  }
-  shinyApp(ui, server)
+\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
+library(shiny)
+library(shinyasync)
+library(bslib)
+ui <- page_fluid(
+  numericInput("B", "Bootstrap resamples", 2000, min = 500, step = 500),
+  input_task_button("go", "Fit"),
+  actionButton("cancel", "Cancel"),
+  plotOutput("slopes")
+)
+server <- function(input, output, session) {
+  # The button shows its busy state while the fits run on a worker.
+  slopes <- reactiveAsync(
+    replicate(input$B, coef(lm(mpg ~ wt, mtcars[sample(32, replace = TRUE), ]))[[2]])
+  ) |>
+    bindEvent(input$go) |>
+    bind_task_button("go")
+  observe(cancel_async(slopes)) |> bindEvent(input$cancel)
+  output$slopes <- renderPlot(hist(slopes(), main = "Bootstrap slopes of mpg on wt"))
 }
+shinyApp(ui, server)
+\dontshow{\}) # examplesIf}
+}
+\seealso{
+\code{\link[=cancel_async]{cancel_async()}} and \code{\link[=status_async]{status_async()}}.
 }
