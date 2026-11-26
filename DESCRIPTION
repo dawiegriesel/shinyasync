@@ -17,7 +17,7 @@ Imports:
     cli,
     codetools,
     later,
-    mirai (>= 2.5.0),
+    mirai (>= 2.5.1),
     parallel,
     promises,
     shiny (>= 1.8.1)

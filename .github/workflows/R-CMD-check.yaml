@@ -44,11 +44,11 @@ jobs:
           # The minimum job takes hard dependencies only and names the
           # Suggests it needs: with all dependencies, pak also resolves the
           # Suggests of shiny and bslib, whose current versions need R >= 4.2.
-          # mirai 2.5.0 calls nanonext internals that later nanonext releases
-          # removed, so nanonext is pinned to the floor mirai 2.5.0 declares.
+          # mirai 2.5.1 calls nanonext internals that later nanonext releases
+          # removed, so nanonext is pinned to the floor mirai 2.5.1 declares.
           dependencies: ${{ matrix.config.minimum && '"hard"' || '"all"' }}
           extra-packages: >-
-            any::rcmdcheck${{ matrix.config.minimum && ', mirai@2.5.0, nanonext@1.7.0, shiny@1.8.1, bslib@0.7.0, any::testthat, any::withr, any::knitr, any::rmarkdown, any::jsonlite' || '' }}
+            any::rcmdcheck${{ matrix.config.minimum && ', mirai@2.5.1, nanonext@1.7.1, shiny@1.8.1, bslib@0.7.0, any::testthat, any::withr, any::knitr, any::rmarkdown, any::jsonlite' || '' }}
           needs: check
       - uses: r-lib/actions/check-r-package@v2
         with:
