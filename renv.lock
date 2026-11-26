@@ -939,7 +939,7 @@
     },
     "mirai": {
       "Package": "mirai",
-      "Version": "2.7.3",
+      "Version": "2.7.4",
       "Source": "Repository",
       "Type": "Package",
       "Title": "Minimalist Async Evaluation Framework for R",
@@ -952,7 +952,7 @@
         "R (>= 3.6)"
       ],
       "Imports": [
-        "nanonext (>= 1.10.3)"
+        "nanonext (>= 1.10.4)"
       ],
       "Suggests": [
         "cli",
@@ -980,7 +980,7 @@
     },
     "nanonext": {
       "Package": "nanonext",
-      "Version": "1.10.3",
+      "Version": "1.10.4",
       "Source": "Repository",
       "Type": "Package",
       "Title": "Lightweight Toolkit for Messaging, Concurrency and the Web",

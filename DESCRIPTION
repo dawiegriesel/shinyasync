@@ -16,7 +16,7 @@ Depends:
 Imports: 
     cli,
     codetools,
-    mirai (>= 2.5.1),
+    mirai (>= 2.7.4),
     parallel,
     promises,
     shiny (>= 1.8.1)
