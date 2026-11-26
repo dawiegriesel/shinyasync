@@ -15,9 +15,12 @@
   references, as code from a sourced file, a box module or the console does.
   The rewrite deleted the body, so the function returned its srcref instead
   (#30).
-* `mirai (>= 2.5.1)` is required. `pool_async(everywhere = )` passes `.min`
-  to `mirai::everywhere()`, which mirai 2.5.0 does not have, so every
-  preload failed with an older mirai.
+* `mirai (>= 2.7.4)` is required. It fixes a race in which a task that
+  completed while its promise was being registered never notified, so the
+  reactive stayed `"running"` (r-lib/mirai#656, r-lib/nanonext#363). Thanks
+  to Charlie Gao (@shikokuchuo) for reviewing and releasing the fix.
+  shinyasync's own check after registration is removed. mirai 2.7.4 also
+  has `everywhere(.min = )`, which `pool_async(everywhere = )` needs.
 
 # shinyasync 0.5.0
 
