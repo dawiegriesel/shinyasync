@@ -1,47 +1,51 @@
 library(shiny)
 library(shinyasync)
 
-# A module that fits a density to random data. Everything inside the module
-# server is ordinary Shiny; reactiveAsync() captures the namespaced `input`
-# and the module's local objects like any other reactive.
-densityUI <- function(id) {
+# A module that bootstraps the slope of a response on a chosen predictor,
+# mounted twice on different data. Everything inside the module server is
+# ordinary Shiny; reactiveAsync() captures the namespaced `input` and the
+# module's arguments and local functions like any other reactive.
+bootUI <- function(id, dataset, response) {
   ns <- NS(id)
   tagList(
-    sliderInput(ns("n"), "Rows", 1e3, 1e7, 1e5),
-    plotOutput(ns("p")),
+    selectInput(ns("x"), paste("Predictor of", response), setdiff(names(dataset), response)),
+    sliderInput(ns("B"), "Bootstrap resamples", 500, 5000, 2000, step = 500),
+    plotOutput(ns("slopes")),
     textOutput(ns("status"))
   )
 }
 
-densityServer <- function(id, sd = 1) {
+bootServer <- function(id, dataset, response) {
   moduleServer(id, function(input, output, session) {
-    simulate <- function(n) density(rnorm(n, sd = sd))   # shipped to the worker
+    slope <- function(d, x) coef(lm(reformulate(x, response), d))[[2]]   # shipped to the worker
 
-    d <- reactiveAsync(simulate(input$n))
+    slopes <- reactiveAsync(
+      replicate(input$B, slope(dataset[sample(nrow(dataset), replace = TRUE), ], input$x))
+    )
 
-    output$p      <- renderPlot(plot(d(), main = session$ns("")))
-    output$status <- renderText(status_async(d))
+    output$slopes <- renderPlot(hist(slopes(), main = session$ns(""), xlab = "Slope"))
+    output$status <- renderText(status_async(slopes))
 
-    d   # return the async reactive so the caller can use it
+    slopes   # return the async reactive so the caller can use it
   })
 }
 
+pool_async(workers = 2)   # optional: sizes the pool for the whole app
+
 ui <- fluidPage(
   fluidRow(
-    column(6, densityUI("left")),
-    column(6, densityUI("right"))
+    column(6, bootUI("cars", mtcars, "mpg")),
+    column(6, bootUI("air", airquality, "Ozone"))
   ),
   textOutput("both")
 )
 
 server <- function(input, output, session) {
-  pool_async(workers = 2)               # optional: sizes the pool for the whole app
-
-  left  <- densityServer("left", sd = 1)
-  right <- densityServer("right", sd = 3)
+  cars <- bootServer("cars", mtcars, "mpg")
+  air  <- bootServer("air", airquality, "Ozone")
 
   output$both <- renderText(
-    sprintf("Bandwidths: %.3f and %.3f", left()$bw, right()$bw)
+    sprintf("Median slopes: %.3f and %.3f", median(cars()), median(air()))
   )
 }
 
