@@ -40,17 +40,11 @@ test_that("cancelling a task that was started after an error clears the error", 
   })
 })
 
-test_that("the post-registration check is gated on the nanonext version", {
-  local_mocked_bindings(packageVersion = function(...) package_version("1.10.3"), .package = "utils")
-  expect_true(loses_notification())
-  local_mocked_bindings(packageVersion = function(...) package_version("1.10.3.9000"), .package = "utils")
-  expect_false(loses_notification())
-})
-
 test_that("a task that completes before its promise is registered still settles", {
   # mirai's as.promise() checks unresolved() and then registers the
-  # notification with .keep(); a task that completes in between never
-  # notifies. Widen that window so every task falls into it.
+  # notification with .keep(); before mirai 2.7.4 a task that completed in
+  # between never notified (r-lib/mirai#656). Widen that window so every
+  # task falls into it.
   local_pool()
   keep <- get(".keep", asNamespace("nanonext"))
   local_mocked_bindings(.keep = function(x, ctx) { Sys.sleep(0.2); keep(x, ctx) }, .package = "mirai")

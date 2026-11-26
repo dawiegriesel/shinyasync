@@ -113,20 +113,6 @@ new_async_task <- function(mode = c("latest", "queue"), label = "shinyasync",
     if (inherits(x, "mirai")) {
       settle <- function(...) finish(function() settle_mirai(x$data, inputs))
       promises::then(x, onFulfilled = settle, onRejected = settle)
-      # Up to nanonext 1.10.3, mirai's as.promise() checked unresolved() and
-      # then registered the notification, and a task that completed between
-      # the two never notified (r-lib/mirai#656; the first registration in a
-      # process loads later, which is window enough for a quick task). then()
-      # has returned, so the notification is registered now: a task found
-      # resolved here either completed in that window or is about to notify,
-      # and finish() settles once either way. nanonext 1.10.3.9000 checks for
-      # completion when it registers (r-lib/nanonext#363), so the check is
-      # skipped there and can go once that version is required.
-      if (loses_notification()) {
-        later::later(function() {
-          if (!done && gen == st$gen && !mirai::unresolved(x)) settle()
-        })
-      }
     } else {
       promises::then(
         x,
@@ -229,11 +215,6 @@ new_async_task <- function(mode = c("latest", "queue"), label = "shinyasync",
   if (!is.null(domain)) domain$onSessionEnded(st$abandon)
 
   st
-}
-
-# Whether the installed nanonext can lose a promise notification; see adopt().
-loses_notification <- function() {
-  utils::packageVersion("nanonext") < "1.10.3.9000"
 }
 
 # Send a resolved job (see new_capture()) to a worker. `...` goes to mirai().

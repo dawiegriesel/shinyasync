@@ -16,7 +16,6 @@ Depends:
 Imports: 
     cli,
     codetools,
-    later,
     mirai (>= 2.5.1),
     parallel,
     promises,
@@ -25,6 +24,7 @@ Suggests:
     bslib (>= 0.7.0),
     jsonlite,
     knitr,
+    later,
     rmarkdown,
     testthat (>= 3.0.0),
     withr
