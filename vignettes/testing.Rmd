@@ -3,7 +3,7 @@ title: "Testing async reactives"
 output: rmarkdown::html_vignette
 vignette: >
   %\VignetteIndexEntry{Testing async reactives}
-  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEngine{knitr::rmarkdown_notangle}
   %\VignetteEncoding{UTF-8}
 ---
 
