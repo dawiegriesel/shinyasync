@@ -13,6 +13,8 @@ jobs:
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
       RENV_CONFIG_AUTOLOADER_ENABLED: false
+      # vignette("testing") evaluates its chunks only when NOT_CRAN is "true".
+      NOT_CRAN: true
     steps:
       - uses: actions/checkout@v7
       - uses: r-lib/actions/setup-pandoc@v2
