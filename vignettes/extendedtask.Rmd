@@ -302,8 +302,8 @@ finish and let Shiny see the result, which takes a few lines of
 ## What the layer costs
 
 shinyasync finds the reactive reads in the expression by looking at it, which
-`ExtendedTask` never has to do. The limits follow from that, and the README
-section "How dependency capture works" lists them. The ones you are most
+`ExtendedTask` never has to do. The limits follow from that, and
+`vignette("capture")` lists them. The ones you are most
 likely to meet:
 
 - Reads must appear literally in the expression. `input[[paste0("x", i)]]`

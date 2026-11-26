@@ -1,0 +1,101 @@
+---
+title: "How dependency capture works"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{How dependency capture works}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+options(cli.num_colors = 1L)
+```
+
+An async expression is split in two. Reactive reads that appear literally in
+it, such as `input$x`, `input[["x"]]`, `rv$y`, `data()` or `mod$data()`, are
+evaluated on the session thread, where they register dependencies as usual.
+So are `req()`, `validate()`, `invalidateLater()`, `isolate()`,
+`status_async()` and `has_value_async()`, whether written bare, as
+`shiny::req()`, or through a module object as `shiny$req()`, the form
+`box::use(shiny)` gives. Their values, together with any user-defined
+functions and objects the expression refers to, are sent to a worker that
+evaluates the rest. Packages attached in the session and used by the
+expression, directly or through a helper it ships, are attached in the worker.
+
+## Seeing the split
+
+`print()` shows the split for an async reactive: the calls evaluated on the
+session, the objects and packages shipped to the worker, and the rewritten
+worker expression. Nothing is evaluated and the task is not started, so it
+works outside a running app. Here a `reactiveValues()` stands in for `input`:
+
+```{r}
+library(shiny)
+library(shinyasync)
+
+input <- reactiveValues(x = "wt", B = 2000)
+slope <- function(d, x) coef(lm(reformulate(x, "mpg"), d))[[2]]
+
+slopes <- reactiveAsync(
+  replicate(input$B, slope(mtcars[sample(nrow(mtcars), replace = TRUE), ], input$x))
+)
+print(slopes)
+```
+
+The `session` line lists the reads hoisted to placeholders, `shipped` the
+helpers and objects serialized with each task, and `worker` the expression the
+worker evaluates. A `resident` line lists names preloaded on the workers with
+`pool_async(everywhere = )`, and a `missing` line lists functions the session
+could not find.
+
+In `shiny::devmode()` each async reactive prints itself on its first run, and
+each `mirai_async()` call site the first time it runs in a session, without
+the worker expression, so the console shows what every task shipped. Set
+`options(shinyasync.print = FALSE)` to turn that off.
+
+## Limits
+
+These follow from capture working on the expression as written:
+
+- **Packages must be attached in the session.** A function is found on the
+  worker because the session found it: `GET()` is shipped as "attach httr"
+  only if `library(httr)` ran in the session. A function the session cannot
+  resolve warns on the first run, and `print()` lists it on a `missing` line;
+  attach the package or write `httr::GET()`. Functions that only exist inside
+  a data mask, such as `n()` in a `dplyr::summarise()` call when dplyr is not
+  attached, trigger the same warning although they work.
+- **Reads must be literal.** Reads inside helper functions or with computed
+  names (`input[[paste0("x", i)]]`) cannot be resolved. Read such values in a
+  separate `reactive()` first, or pass them with `globals = list(...)`.
+- **Every read is a dependency**, even in a branch that is not taken:
+  `if (input$a) input$b else 0` re-runs when `input$b` changes. Wrap a read in
+  `isolate()` to use its value without depending on it.
+- **`req()` and `validate()` run on the session** only when they are certain
+  to run, that is not inside `if`, `&&`, `||`, `switch`, loops or functions,
+  and not when they use variables created inside the expression. Otherwise
+  they run in the worker, where a failure keeps the previous value.
+- **Reads inside formulas are hoisted**, so `lm(y ~ input$x)` fits on the
+  value of `input$x` under a placeholder name. Other formula symbols are
+  shipped if they name a plain object in the session.
+- **Assigning to reactive values** (`rv$x <- ...`) inside the expression is an
+  error. Do that in an `observe()` that reads the result.
+- **Shipped objects are sent on every run.** A session object the expression
+  refers to is serialized with every task, so a large data frame at the top of
+  `app.R` costs its size on every invalidation. Load such objects once on
+  every worker with `pool_async(everywhere = )` instead; the names it creates
+  are *resident* and left out of what a task ships, whether the expression
+  uses them directly or through a helper it ships. See
+  `vignette("deployment")`.
+- **An upstream `reactiveAsync()` is waited for.** A downstream keeps its
+  previous value while an upstream it reads catches up; the rules, including
+  the `bindEvent()` cases, are under "Chained async reactives" in
+  `vignette("shinyasync")`.
+
+## Reporting a capture problem
+
+Capture rewrites your expression, so it can get a case wrong. If an
+expression works in a plain `reactive()` but fails or behaves differently in
+`reactiveAsync()`, please open an
+[issue](https://github.com/dawiegriesel/shinyasync/issues) with the
+expression and the output of `print()` on it.

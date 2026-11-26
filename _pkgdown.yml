@@ -7,8 +7,11 @@ articles:
 - title: Articles
   navbar: ~
   contents:
-  - extendedtask
+  - shinyasync
+  - capture
+  - deployment
   - testing
+  - extendedtask
 
 reference:
 - title: Async reactives
@@ -19,11 +22,13 @@ reference:
   - reactiveValAsync
   - mirai_async
 - title: Status and control
+  desc: Read the state of an async object for spinners and buttons, or stop its task.
   contents:
   - status_async
   - has_value_async
   - cancel_async
   - bind_task_button
 - title: Daemon pool
+  desc: Size the pool of mirai daemons and preload the workers.
   contents:
   - pool_async

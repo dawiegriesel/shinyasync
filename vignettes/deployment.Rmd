@@ -1,0 +1,108 @@
+---
+title: "Deployment and the daemon pool"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Deployment and the daemon pool}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", eval = FALSE)
+```
+
+shinyasync is deployment-agnostic: an app that runs locally runs the same way
+on Shiny Server, Posit Connect, a container or behind a multi-process load
+balancer. What changes between them is how many workers each R process should
+have.
+
+## Sizing the pool
+
+Each R process gets its own daemon pool. Unless you call `pool_async()`, the
+first task starts one with one less worker than the cores available to the
+process; a container's CPU quota or cpuset counts, as on Posit Connect. To set
+the size yourself, call it at the top level of `app.R`, so the pool is started
+once per process and held until the app stops:
+
+```{r}
+library(shiny)
+library(shinyasync)
+
+pool_async(workers = 4)
+
+ui <- fluidPage(...)
+server <- function(input, output, session) { ... }
+shinyApp(ui, server)
+```
+
+Under a multi-process load balancer such as
+[faucet](https://github.com/ixpantia/faucet) or Posit Connect with several
+processes per app, every process starts its own pool. Size `workers` so that
+`processes × workers` fits the host, or point every process at one shared
+remote daemon set. The arguments of `pool_async()` pass through to
+`mirai::daemons()`:
+
+```{r}
+pool_async(url = "tcp://daemon-host:5555")
+```
+
+If you already manage `mirai::daemons()` yourself, skip `pool_async()`; the
+package uses the daemons you set and leaves them alone.
+
+## Monitoring the pool
+
+Tasks run first come, first served across one pool, so a button-triggered task
+can wait behind background refreshes. `mirai::status()` reports the worker
+count, how many tasks are executing and how many are waiting for a worker, so a
+task monitor can show why something has not started:
+
+```{r}
+output$pool <- renderText({
+  invalidateLater(1000)
+  s <- mirai::status()
+  sprintf("%d workers, %d running, %d queued",
+          s$connections, s$mirai[["executing"]], s$mirai[["awaiting"]])
+})
+```
+
+Each worker attaches a package the first time a task needs it; later tasks on
+that worker find it already attached.
+
+## Preloading the workers
+
+Objects a task refers to are serialized to the worker on every run, and a
+database connection cannot be serialized at all. Run the code that creates them
+once on every worker instead:
+
+```{r}
+pool_async(workers = 4, everywhere = {
+  sales <- arrow::read_parquet("data/sales.parquet")  # one copy per worker
+  con <- DBI::dbConnect(RSQLite::SQLite(), "app.db")  # cannot be serialized
+  rates <- fx_rates                                   # shipped once from the session
+  .Last <- function() DBI::dbDisconnect(con)          # runs when the worker exits
+})
+
+server <- function(input, output, session) {
+  by_region <- reactiveAsync(summarise_sales(sales, con, input$region))
+}
+```
+
+The expression runs with `mirai::everywhere()` when the pool starts, before any
+task. Objects it refers to are resolved in the calling environment and sent
+once; the names it assigns and those objects are *resident*, so tasks do not
+ship them even when the session holds an object of the same name, and
+`print()` shows them on a `resident` line.
+
+Things to know before relying on it:
+
+- **Call it at the top level of `app.R`**, so the preload runs once per
+  process and connections live until the app stops.
+- **Resident data is static.** Data that changes belongs in a reactive read.
+- **Every worker holds its own copy and opens its own connection**, so size
+  memory and the database's connection limit by `processes × workers`.
+- **Close connections with `.Last`.** Assign a `.Last` function in the
+  expression: R runs it when the worker process exits, on pool shutdown and
+  when the app process dies, and the pool does not wait for it.
+- **Late daemons are not preloaded.** A daemon that joins after the preload,
+  as a remote daemon may, does not receive it; a task using a resident name
+  there fails with a message saying so.

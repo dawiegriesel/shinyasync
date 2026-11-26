@@ -1,0 +1,262 @@
+---
+title: "Get started"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Get started}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", eval = FALSE)
+```
+
+shinyasync moves slow work off the Shiny session thread. You write the app
+as you would with `reactive()`, `observe()` and `reactiveVal()`, and add
+`Async` to the ones that do slow work:
+
+| Shiny            | shinyasync            |
+|------------------|-----------------------|
+| `reactive()`     | `reactiveAsync()`     |
+| `observe()`      | `observeAsync()`      |
+| `reactiveVal()`  | `reactiveValAsync()`  |
+
+Each one evaluates its expression on a `mirai` daemon, tracks reactive
+dependencies as usual, cancels a run that a newer input has made obsolete, and
+returns the previous value while the new one is computed. This article walks
+through the patterns a real app needs, one at a time.
+
+## A first app
+
+```{r}
+library(shiny)
+library(shinyasync)
+
+ui <- fluidPage(
+  selectInput("x", "Predictor of mpg", c("wt", "hp", "disp", "qsec")),
+  sliderInput("B", "Bootstrap resamples", 500, 5000, 2000, step = 500),
+  plotOutput("slopes"),
+  textOutput("status")
+)
+
+server <- function(input, output, session) {
+  slopes <- reactiveAsync({
+    f <- reformulate(input$x, "mpg")    # runs in a worker, not the session
+    replicate(input$B, {
+      resample <- mtcars[sample(nrow(mtcars), replace = TRUE), ]
+      coef(lm(f, resample))[[2]]
+    })
+  })
+
+  output$slopes <- renderPlot(hist(slopes(), main = "Bootstrap slopes", xlab = "Slope"))
+  output$status <- renderText(status_async(slopes))
+}
+
+shinyApp(ui, server)
+```
+
+Change the predictor while a fit is running: the run on the old predictor is
+cancelled, the previous histogram stays on screen until the new one arrives,
+and other users of the app are never blocked. The first task starts a daemon
+pool shared by every session in the process. To size it, call `pool_async()`
+at the top level of `app.R`; `vignette("deployment")` explains how to choose
+the size.
+
+The app is in the package:
+`shiny::runApp(system.file("examples/quickstart", package = "shinyasync"))`.
+
+## Spinner or previous result
+
+While a task runs the status is `"running"` whether or not there is a previous
+value on screen. `has_value_async()` tells the two apart:
+
+```{r}
+output$note <- renderUI({
+  running <- status_async(slopes) == "running"
+  if (running && !has_value_async(slopes)) icon("spinner", class = "fa-spin")
+  else if (running) span(class = "text-muted", "Showing the previous result while the new one computes")
+})
+```
+
+Before the first task is sent to a worker the status is `"initial"`, as for
+an `ExtendedTask`.
+
+## Button-triggered
+
+Use `bindEvent()` exactly as you would with `reactive()`:
+
+```{r}
+fit <- reactiveAsync(fit_model(input$formula, data())) |>
+  bindEvent(input$go)
+```
+
+A cancel button calls `cancel_async(fit)`. Afterwards the status is `"idle"`,
+a status an `ExtendedTask` does not have, while `has_value_async(fit)` stays
+`TRUE`, and the previous result remains on screen until the next click starts
+a new task.
+
+With bslib, `bind_task_button()` keeps an `input_task_button()` busy while the
+task runs, as it does for an `ExtendedTask`:
+
+```{r}
+fit <- reactiveAsync(fit_model(input$formula, data())) |>
+  bindEvent(input$go) |>
+  bslib::bind_task_button("go")
+```
+
+## Hidden outputs
+
+A task starts the first time its reactive or status is read. Shiny suspends
+outputs in hidden tabs, so a task that only hidden outputs read does not start
+until the tab is opened. To start it on load, as in plain Shiny:
+
+```{r}
+outputOptions(output, "forecast", suspendWhenHidden = FALSE)
+```
+
+## Debounced input
+
+Debounce the input in a plain `reactive()` and read that:
+
+```{r}
+query <- debounce(reactive(input$query), 400)
+
+results <- reactiveAsync(search_db(query()))
+```
+
+## Side effects
+
+`observeAsync()` runs a side effect on a worker. Nothing reads an observer's
+result, so an error is reported with `message()` and the status becomes
+`"error"` until a dependency changes.
+
+```{r}
+observeAsync({
+  write_audit_log(input$user, results())
+})
+```
+
+There is no queue mode for observers: a dependency change cancels a running
+side effect. For a write that must not be skipped, use
+`reactiveAsync(..., mode = "queue")` and read its result in an output, as
+`vignette("extendedtask")` shows.
+
+## Background refresh
+
+`invalidateLater()` runs on the session, so it re-runs the task on a timer
+without blocking anything:
+
+```{r}
+dashboard <- reactiveAsync({
+  invalidateLater(60e3)
+  fetch_dashboard_data()
+})
+```
+
+## Manual control and fan-out
+
+`reactiveValAsync()` is the imperative counterpart: a value you set from an
+observer rather than derive, as with `reactiveVal()`. `mirai_async()` starts a
+task with the same capture as `reactiveAsync()` and returns the plain `mirai`
+its setter accepts, so one observer can start a task per item:
+
+```{r}
+forecasts <- lapply(spots, function(spot) reactiveValAsync())
+
+observe({
+  for (i in seq_along(spots)) {
+    # fetch_marine() and its helpers are shipped; input$days is a dependency.
+    forecasts[[i]](mirai_async(fetch_marine(spots[[i]], days = input$days)))
+  }
+}) |> bindEvent(input$refresh)
+
+output$table <- renderTable(do.call(rbind, lapply(forecasts, function(f) f())))
+```
+
+For a single button-triggered task, `reactiveAsync() |> bindEvent()` is all
+you need.
+
+## Chained async reactives
+
+An async reactive can read another one, exactly as a `reactive()` would:
+
+```{r}
+wind   <- reactiveAsync(fetch_wind(input$spot))
+scored <- reactiveAsync(score(wind(), input$spot))
+```
+
+While `wind` is catching up with a new `input$spot`, `scored` keeps its
+previous value rather than combining the new spot with wind fetched for the
+old one, and re-runs once `wind` has settled. That is what a chain of
+`reactive()` expressions does, so nothing in the expression changes. In
+detail:
+
+- **The downstream waits.** While an upstream it reads is catching up with
+  its own inputs, the downstream keeps its previous value, reports
+  `"running"` while that upstream runs, and re-runs once it has settled. In
+  `mode = "latest"` a run already computing on the old upstream value is
+  dropped.
+- **Staleness and errors follow the chain.** An error in `wind` propagates to
+  `scored` on its next read.
+- **An upstream gated by `bindEvent()`.** A downstream that also reads one of
+  the upstream's inputs waits for the upstream's next event instead of
+  recomputing with the old upstream value. Wrap the upstream read in
+  `isolate()` if you want neither the wait nor the dependency.
+- **A downstream gated by `bindEvent()`.** If its event fires while its
+  upstream is running, it runs once the upstream settles, as a synchronous
+  `reactive()` would have been ready at the click. If the upstream is stale
+  but not running, the event is dropped.
+
+## Modules
+
+Nothing changes inside `moduleServer()`: the namespaced `input` and the
+module's arguments and local functions are captured like any others, and the
+async reactive can be returned to the caller.
+
+```{r}
+bootServer <- function(id, dataset, response) {
+  moduleServer(id, function(input, output, session) {
+    slope <- function(d, x) coef(lm(reformulate(x, response), d))[[2]]   # shipped to the worker
+
+    slopes <- reactiveAsync(
+      replicate(input$B, slope(dataset[sample(nrow(dataset), replace = TRUE), ], input$x))
+    )
+
+    output$slopes <- renderPlot(hist(slopes(), main = session$ns(""), xlab = "Slope"))
+    output$status <- renderText(status_async(slopes))
+    slopes
+  })
+}
+
+server <- function(input, output, session) {
+  cars <- bootServer("cars", mtcars, "mpg")
+  air  <- bootServer("air", airquality, "Ozone")
+
+  output$both <- renderText(
+    sprintf("Median slopes: %.3f and %.3f", median(cars()), median(air()))
+  )
+}
+```
+
+The full app, with its UI, is in the package:
+`shiny::runApp(system.file("examples/modules", package = "shinyasync"))`.
+
+## A complete app
+
+[shinyasync-example](https://github.com/dawiegriesel/shinyasync-example) is a
+surf forecast dashboard that uses every primitive in the package: parallel API
+fetches with stale-while-revalidate, a chained async score, a button-triggered
+simulation with cancel, a background refresh, an `observeAsync()` cache writer,
+a raw mirai feeding `reactiveValAsync()`, a module mounted twice, and a pool
+preloaded with a request template through `pool_async(everywhere = )`. A task
+monitor in the sidebar shows the status of each one.
+
+## Where next
+
+- `vignette("capture")`: what an async expression can contain, how to see
+  what it ships with `print()`, and the limits that follow.
+- `vignette("deployment")`: sizing the pool, multi-process servers, monitoring
+  and preloading the workers.
+- `vignette("testing")`: testing async reactives with `shiny::testServer()`.
+- `vignette("extendedtask")`: one app written with `ExtendedTask` and with
+  shinyasync, side by side.
