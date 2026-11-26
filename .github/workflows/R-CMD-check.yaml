@@ -41,8 +41,12 @@ jobs:
           use-public-rspm: true
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
+          # The minimum job takes hard dependencies only and names the
+          # Suggests it needs: with all dependencies, pak also resolves the
+          # Suggests of shiny and bslib, whose current versions need R >= 4.2.
+          dependencies: ${{ matrix.config.minimum && '"hard"' || '"all"' }}
           extra-packages: >-
-            any::rcmdcheck${{ matrix.config.minimum && ', mirai@2.5.0, shiny@1.8.1, bslib@0.7.0' || '' }}
+            any::rcmdcheck${{ matrix.config.minimum && ', mirai@2.5.0, shiny@1.8.1, bslib@0.7.0, any::testthat, any::withr, any::knitr, any::rmarkdown, any::jsonlite' || '' }}
           needs: check
       - uses: r-lib/actions/check-r-package@v2
         with:
