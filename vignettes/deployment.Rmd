@@ -3,7 +3,7 @@ title: "Deployment and the daemon pool"
 output: rmarkdown::html_vignette
 vignette: >
   %\VignetteIndexEntry{Deployment and the daemon pool}
-  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEngine{knitr::rmarkdown_notangle}
   %\VignetteEncoding{UTF-8}
 ---
 
