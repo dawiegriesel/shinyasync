@@ -7,3 +7,4 @@ renv/local/
 renv/staging/
 docs/
 CLAUDE.md
+.DS_Store
